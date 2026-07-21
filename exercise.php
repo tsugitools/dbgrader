@@ -165,8 +165,10 @@ function dbgrader_load_custom_exercise() {
 /**
  * Load exercise from link JSON; else custom config; else built-in; else empty.
  *
- * When Settings has a built-in exercise key, that wins over stale link JSON whose
- * `builtin` field does not match (so switching assignments in Settings updates Edit).
+ * When Settings has a built-in exercise key, reload from the PHP catalog when:
+ *   - link JSON is empty / missing,
+ *   - JSON builtin key does not match, or
+ *   - JSON builtin_rev is stale (catalog file changed) and not marked custom.
  *
  * @return array{exercise: array, assignmentKey: ?string}
  */
@@ -179,14 +181,19 @@ function dbgrader_load_exercise($LINK) {
     }
     $existing = dbgrader_decode_exercise_json($raw);
 
-    // Settings selected a built-in that is not what the link JSON was loaded from.
     if ($assignmentKey) {
         $builtin = dbgrader_builtin_exercise($assignmentKey);
         if ($builtin) {
             $jsonBuiltin = (is_array($existing) && isset($existing['builtin']))
                 ? $existing['builtin']
                 : null;
-            if (!$existing || $jsonBuiltin !== $assignmentKey) {
+            $jsonRev = (is_array($existing) && isset($existing['builtin_rev']))
+                ? $existing['builtin_rev']
+                : null;
+            $fileRev = isset($builtin['builtin_rev']) ? $builtin['builtin_rev'] : null;
+            $isCustom = ($jsonRev === 'custom');
+            $stale = !$isCustom && $fileRev && $jsonRev !== $fileRev;
+            if (!$existing || $jsonBuiltin !== $assignmentKey || $stale) {
                 if ($LINK && method_exists($LINK, 'setJson') && !empty($LINK->id)) {
                     $LINK->setJson(json_encode($builtin));
                 }
@@ -195,7 +202,7 @@ function dbgrader_load_exercise($LINK) {
                     'assignmentKey' => $assignmentKey,
                 );
             }
-            // Same built-in as JSON — keep the (possibly edited) link copy.
+            // Same built-in (or instructor-customized copy) — keep link JSON.
             return array(
                 'exercise' => $existing,
                 'assignmentKey' => $assignmentKey,

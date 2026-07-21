@@ -17,18 +17,19 @@ $LTI = LTIX::session_start();
 
 // If the instructor picks a built-in assignment in Settings, copy it into
 // lti_link.json so Edit is populated. Save from Edit overwrites that JSON.
+// Re-saving Settings with the same built-in also refreshes from the catalog file.
 $oldExerciseSetting = Settings::linkGet('exercise');
 if (SettingsForm::handleSettingsPost()) {
     $newExerciseSetting = Settings::linkGet('exercise');
     $assignmentChanged = $newExerciseSetting && $newExerciseSetting !== '0'
         && (string) $newExerciseSetting !== (string) $oldExerciseSetting;
-    if ($assignmentChanged) {
-        $builtin = dbgrader_builtin_exercise($newExerciseSetting);
-        if ($builtin && isset($LINK) && $LINK && method_exists($LINK, 'setJson')) {
-            $LINK->setJson(json_encode($builtin));
-        }
+    $builtin = ($newExerciseSetting && $newExerciseSetting !== '0')
+        ? dbgrader_builtin_exercise($newExerciseSetting)
+        : null;
+    if ($builtin && isset($LINK) && $LINK && method_exists($LINK, 'setJson')) {
+        $LINK->setJson(json_encode($builtin));
     }
-    $redirectMode = $assignmentChanged || U::get($_GET, 'mode') === 'author'
+    $redirectMode = $assignmentChanged || $builtin || U::get($_GET, 'mode') === 'author'
         ? '?mode=author'
         : '';
     header('Location: ' . addSession('index.php' . $redirectMode));

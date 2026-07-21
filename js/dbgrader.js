@@ -438,9 +438,11 @@
             compatibility: compatibility
         };
         // Keep built-in identity so Settings can tell when to reload a different assignment.
+        // Mark as custom so catalog file updates do not wipe instructor Edit/Save changes.
         var builtinKey = cfg.assignmentKey || exercise.builtin || null;
         if (builtinKey) {
             out.builtin = builtinKey;
+            out.builtin_rev = 'custom';
         }
         return out;
     }

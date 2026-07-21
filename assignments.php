@@ -14,6 +14,8 @@ $assignments = array(
     'PantryExercise' => 'Pantry Items Over 30 Ounces',
     'SimpleWhereExercise' => 'A Simple Query with a WHERE clause',
     'PollsExercise' => 'Polls Loading One-to-Many Data',
+    'ModelsExercise' => 'Django Models — Local Library Catalog',
+    'UnescoExercise' => 'Unesco Batch Loading One-to-Many Data',
 );
 
 /**
@@ -39,5 +41,17 @@ function dbgrader_builtin_exercise($key) {
     if (!isset($exercise['builtin'])) {
         $exercise['builtin'] = $key;
     }
+    $exercise['builtin_rev'] = md5_file($path);
     return $exercise;
+}
+
+/**
+ * Fingerprint of a built-in assignment source file.
+ */
+function dbgrader_builtin_rev($key) {
+    if (!$key || !preg_match('/^[A-Za-z][A-Za-z0-9_]*$/', $key)) {
+        return null;
+    }
+    $path = __DIR__ . '/assignments/' . $key . '.php';
+    return is_readable($path) ? md5_file($path) : null;
 }
