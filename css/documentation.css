@@ -1,0 +1,176 @@
+/* Shared styles for DBGrader documentation pages */
+
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+.container {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+h1 {
+    color: #2c3e50;
+    border-bottom: 3px solid #3498db;
+    padding-bottom: 10px;
+}
+
+h2 {
+    color: #34495e;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 5px;
+    margin-top: 30px;
+}
+
+h3 {
+    color: #2c3e50;
+    margin-top: 25px;
+}
+
+.instruction-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+.instruction-table th {
+    background-color: #3498db;
+    color: white;
+    padding: 12px;
+    text-align: left;
+    border: 1px solid #2980b9;
+}
+
+.instruction-table td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+}
+
+.instruction-table tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.code-block {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    overflow-x: auto;
+    margin: 15px 0;
+    white-space: pre;
+    line-height: 1.4;
+}
+
+.tip {
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.tip h4 {
+    color: #0c5460;
+    margin-top: 0;
+}
+
+.example {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.example h4 {
+    color: #155724;
+    margin-top: 0;
+}
+
+.warn {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.warn h4 {
+    color: #856404;
+    margin-top: 0;
+}
+
+.nav-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    border-bottom: 2px solid #dee2e6;
+    margin-bottom: 20px;
+}
+
+.nav-tab {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: 15px;
+}
+
+.nav-tab.active {
+    border-bottom-color: #3498db;
+    color: #3498db;
+    font-weight: bold;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+code {
+    font-family: 'Courier New', monospace;
+    background: #f1f3f5;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.95em;
+}
+
+.footer-about {
+    text-align: center;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-top: 30px;
+}
+
+.footer-about h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.footer-about p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 16px;
+}
+
+hr.doc-rule {
+    margin: 40px 0;
+    border: none;
+    border-top: 2px solid #e9ecef;
+}

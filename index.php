@@ -59,7 +59,9 @@ if ($isInstructor) {
         <span id="exerciseTitle" class="exercise-title"></span>
     </div>
     <div class="topbar-right">
+        <a class="btn btn-ghost" href="documentation.html" target="_blank" rel="noopener noreferrer" title="Help">Help</a>
 <?php if ($isInstructor) : ?>
+        <a class="btn btn-ghost" href="documentation_instructor.html" target="_blank" rel="noopener noreferrer" title="Instructor documentation">Instructor Help</a>
         <a class="btn btn-ghost" href="<?php echo addSession('index.php?mode=author'); ?>">Author</a>
         <a class="btn btn-ghost" href="<?php echo addSession('index.php'); ?>">Learner</a>
         <a class="btn btn-ghost" href="<?php echo addSession('grades.php'); ?>">Student Data</a>

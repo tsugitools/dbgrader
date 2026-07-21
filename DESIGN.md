@@ -803,6 +803,8 @@ PHP stays thin (CMOS / ca4e pattern). Almost all behavior is JavaScript.
 
 ```text
 mod/dbgrader/
+├── documentation.html              # Learner help (tabbed)
+├── documentation_instructor.html   # Instructor docs (tabbed)
 ├── index.php              # LTI session + HTML shell + inject window.DBGRADER
 ├── save.php               # Instructor: POST exercise JSON → lti_link.json
 ├── exercise.php           # Default sample + load helper

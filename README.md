@@ -2,7 +2,11 @@
 
 Interactive SQL autograder for Tsugi. Runs SQLite in the browser via WebAssembly, stores each exercise as JSON on the LTI link, and grades by comparing query results.
 
-## Pattern
+## Documentation
+
+- [documentation.html](documentation.html) — learner help (linked as **Help** for everyone)
+- [documentation_instructor.html](documentation_instructor.html) — authoring / JSON / grading (**Instructor Help**, instructors only)
+- Shared styles: `css/documentation.css`
 
 PHP is intentionally thin (same idea as [ca4e CMOS](https://github.com/csev/ca4e)):
 

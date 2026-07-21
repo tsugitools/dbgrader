@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBGrader Instructor Documentation</title>
+    <link rel="stylesheet" href="css/documentation.css">
+</head>
+<body>
+    <div class="container">
+        <h1>DBGrader — Instructor Documentation</h1>
+        <p style="font-size: 16px; color: #6c757d; margin-bottom: 20px;">
+            Author SQL exercises as JSON on a Tsugi placement, preview expected results in the browser,
+            and grade learners by comparing SQLite outputs. Learner-facing help is in
+            <a href="documentation.html">documentation.html</a>.
+        </p>
+
+        <div class="nav-tabs">
+            <button type="button" class="nav-tab active" onclick="showTab('author', this)">Authoring</button>
+            <button type="button" class="nav-tab" onclick="showTab('modes', this)">Modes</button>
+            <button type="button" class="nav-tab" onclick="showTab('json', this)">Exercise JSON</button>
+            <button type="button" class="nav-tab" onclick="showTab('grading', this)">Grading</button>
+            <button type="button" class="nav-tab" onclick="showTab('runtime', this)">Runtime</button>
+        </div>
+
+        <div id="author" class="tab-content active">
+            <h2>Authoring an Exercise</h2>
+            <p>Open <strong>Author</strong> from the top bar (<code>index.php?mode=author</code>).</p>
+            <ol>
+                <li>Set <strong>Title</strong> and <strong>Prompt</strong></li>
+                <li>Choose <strong>Mode</strong> (<code>query</code> or <code>database-state</code>)</li>
+                <li>Optionally set <strong>Starter SQL</strong> for the learner editor</li>
+                <li>Write <strong>Solution</strong> SQL</li>
+                <li>Write <strong>Setup</strong> SQL (required for query mode; optional for database-state)</li>
+                <li>For database-state, add <strong>Verification SQL</strong> (semicolon-separated)</li>
+                <li><strong>Run query / Run verification preview</strong> to validate instructor SQL</li>
+                <li><strong>Save</strong> to the placement JSON</li>
+                <li><strong>View Assignment JSON</strong> — copy the exercise or a <code>lessons.json</code> custom snippet</li>
+            </ol>
+
+            <div class="tip">
+                <h4>Top bar</h4>
+                <ul>
+                    <li><strong>Help</strong> — learner documentation</li>
+                    <li><strong>Instructor Help</strong> — this page</li>
+                    <li><strong>Settings</strong> — due date and link settings</li>
+                    <li><strong>Student Data</strong> — grades table</li>
+                </ul>
+            </div>
+
+            <div class="warn">
+                <h4>Always preview before publishing</h4>
+                <p>Broken setup or solution SQL shows up as learner-facing failures. Use the author Run / verification preview first.</p>
+            </div>
+        </div>
+
+        <div id="modes" class="tab-content">
+            <h2>Exercise Modes</h2>
+
+            <h3>query</h3>
+            <p>Compare the learner’s result set to the solution’s result set after identical setup on fresh databases.</p>
+            <ul>
+                <li>Best for <code>SELECT</code>, joins, aggregates, ordering, CTEs</li>
+                <li>Setup SQL required</li>
+                <li>Often tagged <code>compatibility: ["dbgrader", "udemy"]</code></li>
+            </ul>
+
+            <h3>database-state</h3>
+            <p>Learner may submit multiple statements (DDL/DML). After setup + solution (or learner SQL),
+               verification queries run; those results are compared.</p>
+            <div class="example">
+                <h4>Useful verification patterns</h4>
+                <div class="code-block">PRAGMA table_info(orders);
+PRAGMA foreign_key_list(orders);
+SELECT name, type, sql FROM sqlite_schema WHERE name = 'orders';
+SELECT COUNT(*) FROM orders;</div>
+            </div>
+            <p>Prefer PRAGMA / catalog checks over comparing raw <code>CREATE TABLE</code> strings so formatting differences do not fail students.</p>
+            <p>Database-state exercises are DBGrader-only (<code>compatibility: ["dbgrader"]</code>).</p>
+        </div>
+
+        <div id="json" class="tab-content">
+            <h2>Exercise JSON and lessons.json</h2>
+            <p>Stored in <code>lti_link.json</code>. Core shape:</p>
+            <div class="code-block">{
+  "version": 1,
+  "type": "sqlite",
+  "mode": "query",
+  "title": "...",
+  "prompt": "...",
+  "setup_sql": "...",
+  "solution_sql": "...",
+  "starter_sql": "...",
+  "verification_sql": [],
+  "comparison": {
+    "column_names": true,
+    "column_order": true,
+    "row_order": true,
+    "numeric_tolerance": 0
+  },
+  "dialect": "sqlite",
+  "compatibility": ["dbgrader", "udemy"]
+}</div>
+
+            <h3>Preload from lessons.json</h3>
+            <p>On first launch with empty link JSON, DBGrader seeds from LTI <code>custom_config</code>,
+               or from <code>?inherit=&lt;resource_link_id&gt;</code> in <code>$CFG-&gt;lessons</code>:</p>
+            <div class="code-block">"custom": [
+  {
+    "key": "config",
+    "json": { /* exercise object */ }
+  }
+]</div>
+            <p>Author → <strong>View Assignment JSON</strong> → <strong>lessons.json custom</strong> tab produces this snippet.</p>
+        </div>
+
+        <div id="grading" class="tab-content">
+            <h2>Grading and Attempts</h2>
+            <ul>
+                <li>Learner <strong>Check Answer</strong> grades in the browser, then calls
+                    <code>/api/record-attempt.php</code> and, on success, <code>/api/grade-submit.php</code> with <code>1.0</code>.</li>
+                <li>Alternate correct SQL is fine if results (or verification results) match.</li>
+                <li><code>comparison</code> controls column names, column order, row order, and numeric tolerance.</li>
+                <li>Exploration commands are rejected for Check Answer.</li>
+            </ul>
+
+            <div class="warn">
+                <h4>Trusted browser environment</h4>
+                <p>Learners can inspect delivered exercise data. Use DBGrader for practice and formative work,
+                   not as a high-stakes secret exam harness.</p>
+            </div>
+        </div>
+
+        <div id="runtime" class="tab-content">
+            <h2>Runtime</h2>
+            <ul>
+                <li>SQLite WASM from <code>$CFG-&gt;staticroot/js/sqlite/sqlite-wasm-3530300/jswasm/</code> (3.53.3)</li>
+                <li>Execution in a Web Worker so slow queries do not freeze the UI</li>
+                <li>Always a fresh <code>:memory:</code> database per Run / Check / preview</li>
+            </ul>
+            <p>See <code>DESIGN.md</code> in this tool for the full design and phased roadmap.</p>
+            <p>Learner explore-command reference: <a href="documentation.html">documentation.html</a>.</p>
+        </div>
+
+        <hr class="doc-rule">
+        <div class="footer-about">
+            <h3>About DBGrader</h3>
+            <p>Tsugi / DJ4E SQL autograder. Design notes live in <code>DESIGN.md</code>.</p>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName, buttonEl) {
+            document.querySelectorAll('.tab-content').forEach(function (content) {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(function (tab) {
+                tab.classList.remove('active');
+            });
+            var panel = document.getElementById(tabName);
+            if (panel) panel.classList.add('active');
+            if (buttonEl) buttonEl.classList.add('active');
+        }
+    </script>
+</body>
+</html>

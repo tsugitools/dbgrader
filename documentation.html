@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBGrader Help</title>
+    <link rel="stylesheet" href="css/documentation.css">
+</head>
+<body>
+    <div class="container">
+        <h1>DBGrader Help</h1>
+        <p style="font-size: 16px; color: #6c757d; margin-bottom: 20px;">
+            Practice SQL in your browser. DBGrader runs <strong>SQLite</strong> locally, lets you explore the database,
+            and grades your answer by comparing <strong>query results</strong>—not by matching your SQL text to a single “correct” string.
+        </p>
+
+        <div class="nav-tabs">
+            <button type="button" class="nav-tab active" onclick="showTab('getting-started', this)">Getting Started</button>
+            <button type="button" class="nav-tab" onclick="showTab('interface', this)">Interface</button>
+            <button type="button" class="nav-tab" onclick="showTab('explore', this)">Explore Commands</button>
+            <button type="button" class="nav-tab" onclick="showTab('tips', this)">Tips</button>
+        </div>
+
+        <div id="getting-started" class="tab-content active">
+            <h2>Getting Started</h2>
+            <ol>
+                <li>Read the exercise prompt carefully.</li>
+                <li>Use <strong>Run</strong> to try SQL and explore the database (not graded).</li>
+                <li>When you think you are done, click <strong>Check Answer</strong>.</li>
+                <li>If correct, your grade can be sent to the LMS. If not, read the feedback and try again.</li>
+            </ol>
+
+            <div class="tip">
+                <h4>Fresh database every time</h4>
+                <p>Each Run and Check Answer starts from a clean in-memory database with the exercise setup applied.
+                   Changes from a previous Run do not stick around.</p>
+            </div>
+
+            <div class="example">
+                <h4>Typical flow</h4>
+                <div class="code-block">SHOW TABLES;
+DESCRIBE pantry_items;
+SELECT item_name, weight_oz FROM pantry_items WHERE weight_oz &gt; 30;
+— then Check Answer</div>
+            </div>
+        </div>
+
+        <div id="interface" class="tab-content">
+            <h2>Learner Interface</h2>
+            <ul>
+                <li><strong>Prompt</strong> — what you need to solve</li>
+                <li><strong>Your SQL</strong> — editor (may already contain starter SQL from your instructor)</li>
+                <li><strong>Run</strong> — execute your SQL or an explore command (not graded)</li>
+                <li><strong>Check Answer</strong> — grade your submission</li>
+                <li><strong>Reset</strong> — restore starter SQL and clear the result panel</li>
+            </ul>
+
+            <h3>Exploration vs grading</h3>
+            <p>Meta-commands like <code>.tables</code>, <code>SHOW TABLES</code>, and <code>\dt</code> are for exploration with <strong>Run</strong> only.
+               They are not accepted as a graded Check Answer—submit real SQL for grading.</p>
+        </div>
+
+        <div id="explore" class="tab-content">
+            <h2>Exploration Commands</h2>
+            <p>These work with <strong>Run</strong>. MySQL- and PostgreSQL-style commands show a note that they were converted to SQLite.</p>
+
+            <h3>SQLite shell style</h3>
+            <table class="instruction-table">
+                <thead>
+                    <tr><th>Command</th><th>Purpose</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>.tables</td><td>List tables</td></tr>
+                    <tr><td>.schema [table]</td><td>Show CREATE statements</td></tr>
+                    <tr><td>.indexes [table]</td><td>List indexes</td></tr>
+                    <tr><td>.databases</td><td>Show :memory:</td></tr>
+                    <tr><td>.columns table</td><td>Column info</td></tr>
+                    <tr><td>.foreignkeys table</td><td>Foreign keys</td></tr>
+                    <tr><td>.describe table</td><td>Columns, indexes, FKs, CREATE</td></tr>
+                    <tr><td>.help</td><td>Command list</td></tr>
+                </tbody>
+            </table>
+
+            <h3>MySQL style</h3>
+            <table class="instruction-table">
+                <thead>
+                    <tr><th>Command</th><th>Purpose</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>SHOW TABLES [LIKE 'p%']</td><td>List tables</td></tr>
+                    <tr><td>SHOW DATABASES</td><td>:memory:</td></tr>
+                    <tr><td>DESCRIBE table / DESC table</td><td>Column info</td></tr>
+                    <tr><td>SHOW CREATE TABLE table</td><td>CREATE statement</td></tr>
+                    <tr><td>SHOW INDEX FROM table</td><td>Indexes</td></tr>
+                </tbody>
+            </table>
+
+            <h3>PostgreSQL (psql) style</h3>
+            <table class="instruction-table">
+                <thead>
+                    <tr><th>Command</th><th>Purpose</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>\dt</td><td>List tables</td></tr>
+                    <tr><td>\d</td><td>List tables and views</td></tr>
+                    <tr><td>\d table</td><td>Describe a table</td></tr>
+                    <tr><td>\di</td><td>List indexes</td></tr>
+                    <tr><td>\dv</td><td>List views</td></tr>
+                    <tr><td>\l</td><td>:memory:</td></tr>
+                    <tr><td>\?</td><td>Help</td></tr>
+                </tbody>
+            </table>
+
+            <div class="tip">
+                <h4>Still SQLite under the hood</h4>
+                <p>Only these exploration helpers are translated. Your graded SQL runs as SQLite.</p>
+            </div>
+        </div>
+
+        <div id="tips" class="tab-content">
+            <h2>Tips</h2>
+            <ul>
+                <li>There can be more than one correct query—matching the expected result matters.</li>
+                <li>If row order is part of the exercise, use <code>ORDER BY</code>.</li>
+                <li>Use explore commands to learn the schema before writing your final query.</li>
+                <li>Read the feedback after Check Answer; it often points at column or row mismatches.</li>
+            </ul>
+        </div>
+
+        <hr class="doc-rule">
+        <div class="footer-about">
+            <h3>DBGrader</h3>
+            <p>In-browser SQLite practice for Tsugi / DJ4E courses.</p>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName, buttonEl) {
+            document.querySelectorAll('.tab-content').forEach(function (content) {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(function (tab) {
+                tab.classList.remove('active');
+            });
+            var panel = document.getElementById(tabName);
+            if (panel) panel.classList.add('active');
+            if (buttonEl) buttonEl.classList.add('active');
+        }
+    </script>
+</body>
+</html>
