@@ -7,11 +7,11 @@ return array(
     'type' => 'sqlite',
     'mode' => 'playground',
     'title' => 'SQL Playground',
-    'prompt' => 'A simple SQLite admin for this browser. Run SQL, explore with .tables, upload or download a .sqlite3 file, and reset when you want a clean database. Your database is stored locally in this browser until you reset or import another file.',
+    'prompt' => 'A simple sqlite3-style shell in the browser. Type SQL ending with a semicolon, or meta-commands like .tables and .help. Upload or download a .sqlite3 file from the Database panel; your database is stored locally in this browser until you reset or import another file.',
     'instructions_url' => '',
     'setup_sql' => '',
     'solution_sql' => '',
-    'starter_sql' => ".tables\n",
+    'starter_sql' => '',
     'verification_sql' => array(),
     'hints' => array(),
     'comparison' => array(

@@ -63,7 +63,8 @@ SELECT item_name, weight_oz FROM pantry_items WHERE weight_oz &gt; 30;
 
         <div id="explore" class="tab-content">
             <h2>Exploration Commands</h2>
-            <p>These work with <strong>Run</strong>. MySQL- and PostgreSQL-style commands show a note that they were converted to SQLite.</p>
+            <p>These work with <strong>Run</strong>. MySQL- and PostgreSQL-style commands show a note that they were converted to SQLite.
+               <code>.help</code> lists the sqlite3-style names only.</p>
 
             <h3>SQLite shell style</h3>
             <table class="instruction-table">
@@ -74,11 +75,11 @@ SELECT item_name, weight_oz FROM pantry_items WHERE weight_oz &gt; 30;
                     <tr><td>.tables</td><td>List tables</td></tr>
                     <tr><td>.schema [table]</td><td>Show CREATE statements</td></tr>
                     <tr><td>.indexes [table]</td><td>List indexes</td></tr>
-                    <tr><td>.databases</td><td>Show :memory:</td></tr>
+                    <tr><td>.databases</td><td>Show attached database</td></tr>
                     <tr><td>.columns table</td><td>Column info</td></tr>
                     <tr><td>.foreignkeys table</td><td>Foreign keys</td></tr>
                     <tr><td>.describe table</td><td>Columns, indexes, FKs, CREATE</td></tr>
-                    <tr><td>.help</td><td>Command list</td></tr>
+                    <tr><td>.help</td><td>Command list (sqlite3 names)</td></tr>
                 </tbody>
             </table>
 
@@ -89,7 +90,7 @@ SELECT item_name, weight_oz FROM pantry_items WHERE weight_oz &gt; 30;
                 </thead>
                 <tbody>
                     <tr><td>SHOW TABLES [LIKE 'p%']</td><td>List tables</td></tr>
-                    <tr><td>SHOW DATABASES</td><td>:memory:</td></tr>
+                    <tr><td>SHOW DATABASES</td><td>Attached database</td></tr>
                     <tr><td>DESCRIBE table / DESC table</td><td>Column info</td></tr>
                     <tr><td>SHOW CREATE TABLE table</td><td>CREATE statement</td></tr>
                     <tr><td>SHOW INDEX FROM table</td><td>Indexes</td></tr>
@@ -107,7 +108,7 @@ SELECT item_name, weight_oz FROM pantry_items WHERE weight_oz &gt; 30;
                     <tr><td>\d table</td><td>Describe a table</td></tr>
                     <tr><td>\di</td><td>List indexes</td></tr>
                     <tr><td>\dv</td><td>List views</td></tr>
-                    <tr><td>\l</td><td>:memory:</td></tr>
+                    <tr><td>\l</td><td>Attached database</td></tr>
                     <tr><td>\?</td><td>Help</td></tr>
                 </tbody>
             </table>

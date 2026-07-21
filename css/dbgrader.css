@@ -258,11 +258,18 @@ textarea.code {
     text-align: left;
 }
 
+.dbg-collapse-toggle .status {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-weight: 700;
+}
+
 .dbg-collapse-toggle:hover {
     background: #dde5ee;
 }
 
 .dbg-collapse-title {
+    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -291,6 +298,118 @@ textarea.code {
 
 .dbg-collapse-body .btn-row-tight {
     margin-top: 0.5rem;
+}
+
+/* sqlite3-style playground terminal */
+.cli-term {
+    display: flex;
+    flex-direction: column;
+    min-height: 360px;
+    max-height: min(70vh, 640px);
+    padding: 0;
+    background: #1e1e1e;
+    border-color: #111;
+    color: #d4d4d4;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    overflow: hidden;
+}
+
+.cli-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.75rem 0.9rem 0.35rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    user-select: text;
+    -webkit-user-select: text;
+    outline: none;
+}
+
+.cli-scroll::selection,
+.cli-scroll *::selection {
+    background: #264f78;
+    color: #fff;
+}
+
+.cli-line {
+    margin: 0 0 0.15rem;
+}
+
+.cli-echo-prompt {
+    color: #6a9955;
+    user-select: none;
+}
+
+.cli-echo-cmd,
+.cli-out,
+.cli-err,
+.cli-sys {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.cli-echo-cmd {
+    color: #d4d4d4;
+}
+
+.cli-out,
+.cli-err {
+    margin: 0.15rem 0 0.45rem;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: #d4d4d4;
+    font: inherit;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.cli-err {
+    color: #f48771;
+}
+
+.cli-sys {
+    color: #808080;
+    margin: 0 0 0.25rem;
+}
+
+.cli-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 0 0 auto;
+    padding: 0.5rem 0.9rem 0.65rem;
+    border-top: 1px solid #333;
+    background: #181818;
+}
+
+.cli-prompt {
+    flex: 0 0 auto;
+    margin: 0;
+    color: #6a9955 !important;
+    font-weight: 600;
+    user-select: none;
+}
+
+.cli-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    appearance: none;
+    border: 0 !important;
+    outline: none;
+    box-shadow: none !important;
+    background: transparent !important;
+    color: #d4d4d4 !important;
+    -webkit-text-fill-color: #d4d4d4 !important;
+    caret-color: #d4d4d4;
+    font: inherit;
+    padding: 0.15rem 0;
+}
+
+.cli-input::placeholder {
+    color: #666;
 }
 
 .btn-row, .actions {

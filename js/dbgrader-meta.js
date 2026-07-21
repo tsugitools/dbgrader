@@ -1,22 +1,46 @@
 /**
  * Shell / MySQL / psql-style exploration commands for DBGrader (learner Run only).
  * Not accepted as graded Check Answer submissions.
+ *
+ * .help lists sqlite3-style commands only; MySQL / psql aliases still work.
  */
 (function (global) {
     'use strict';
 
-    var HELP_TEXT = [
-        '.tables / SHOW TABLES / \\dt       List tables (with row counts)',
-        '.schema [table] / \\d [table]      Schema / describe relation',
-        '.indexes [table] / \\di            List indexes',
-        '\\dv                               List views',
-        '.databases / SHOW DATABASES / \\l  Show database (:memory:)',
-        '.columns table / DESCRIBE table   Column info (PRAGMA table_info)',
-        '.describe table                   Columns, indexes, and foreign keys',
-        'SHOW CREATE TABLE table           CREATE statement',
-        'SHOW INDEX FROM table             Indexes for a table',
-        '.help / \\?                        This help'
+    // sqlite3-style listing only (aliases work but stay out of .help)
+    var HELP_ENTRIES = [
+        ['.help ?PATTERN?', 'Show this message'],
+        ['.tables ?TABLE?', 'List names of tables matching LIKE pattern TABLE'],
+        ['.schema ?TABLE?', 'Show the CREATE statements matching TABLE'],
+        ['.indexes ?TABLE?', 'Show names of indexes'],
+        ['.columns TABLE', 'Show column info for TABLE'],
+        ['.describe TABLE', 'Show columns, indexes, and foreign keys'],
+        ['.databases', 'List names of attached databases']
     ];
+
+    function formatHelpText(pattern) {
+        var entries = HELP_ENTRIES;
+        if (pattern) {
+            var p = String(pattern).replace(/^\./, '').toLowerCase();
+            entries = HELP_ENTRIES.filter(function (pair) {
+                return pair[0].toLowerCase().indexOf(p) >= 0
+                    || pair[1].toLowerCase().indexOf(p) >= 0;
+            });
+            if (!entries.length) {
+                return 'No help found for "' + String(pattern) + '"';
+            }
+        }
+        var width = 0;
+        entries.forEach(function (pair) {
+            if (pair[0].length > width) width = pair[0].length;
+        });
+        // sqlite3 pads commands to a comfortable column
+        if (width < 22) width = 22;
+        return entries.map(function (pair) {
+            var pad = width - pair[0].length + 2;
+            return pair[0] + new Array(pad + 1).join(' ') + pair[1];
+        }).join('\n');
+    }
 
     function firstStatement(input) {
         var text = String(input || '').trim();
@@ -80,7 +104,7 @@
             if (!m) return null;
             return {
                 name: m[1].toLowerCase(),
-                arg: m[2] || null,
+                arg: m[2] ? stripQuotes(m[2]) : null,
                 raw: raw,
                 dialect: 'sqlite-shell'
             };
@@ -162,8 +186,7 @@
                 label: 'help',
                 sql: null,
                 result: {
-                    columns: ['command'],
-                    rows: HELP_TEXT.map(function (line) { return [line]; })
+                    text: formatHelpText(arg)
                 }
             }];
         }
@@ -171,8 +194,9 @@
         if (name === 'tables') {
             var tablesSql = "SELECT name AS 'Table' FROM sqlite_schema " +
                 "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'";
-            if (meta.like) {
-                tablesSql += ' AND name LIKE ' + likePatternSql(meta.like);
+            var tableLike = meta.like || arg;
+            if (tableLike) {
+                tablesSql += ' AND name LIKE ' + likePatternSql(tableLike);
             }
             tablesSql += ' ORDER BY name';
             return [{
@@ -237,8 +261,8 @@
                 label: 'databases',
                 sql: null,
                 result: {
-                    columns: ['Database'],
-                    rows: [[':memory:']]
+                    columns: ['name', 'file'],
+                    rows: [['main', '']]
                 }
             }];
         }

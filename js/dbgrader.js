@@ -97,7 +97,14 @@
     }
 
     function renderTable(result) {
-        if (!result || !result.columns) {
+        if (!result) {
+            return '<p class="muted">No result set.</p>';
+        }
+        if (result.text) {
+            return '<pre class="cli-out" style="color:inherit;background:transparent;border:0;margin:0">' +
+                escapeHtml(result.text) + '</pre>';
+        }
+        if (!result.columns) {
             return '<p class="muted">No result set.</p>';
         }
         if (result.columns.length === 0 && (!result.rows || result.rows.length === 0)) {
@@ -291,7 +298,7 @@
             '<option value="upload-check"' + (mode === 'upload-check' ? ' selected' : '') +
             '>upload-check — upload SQLite file; compare verification queries</option>' +
             '<option value="playground"' + (mode === 'playground' ? ' selected' : '') +
-            '>playground — persistent SQL admin (no grading)</option>' +
+            '>playground — sqlite3-style shell (no grading)</option>' +
             '</select></label>' +
             '<label id="starterBlock">Starter SQL for learners <span class="hint">(shown in their editor; leave blank for empty)</span>' +
             '<textarea id="exStarter" class="code" rows="4" spellcheck="false">' +
@@ -779,6 +786,7 @@
             '<button type="button" class="dbg-collapse-toggle" id="btnToggleDbPanel" aria-expanded="' +
             (startCollapsed ? 'false' : 'true') + '" aria-controls="pgDbPanelBody">' +
             '<span class="dbg-collapse-title">' + escapeHtml(title) + ' · Database</span>' +
+            '<span id="runStatus" class="status status-pending">Loading…</span>' +
             '<span class="dbg-collapse-chevron" aria-hidden="true"></span>' +
             '</button>' +
             '<div class="dbg-collapse-body" id="pgDbPanelBody"' + (startCollapsed ? ' hidden' : '') + '>' +
@@ -801,18 +809,13 @@
             'Use Download/Upload for larger files.</p>' +
             '</div>' +
             '</section>' +
-            '<section class="dbg-panel editor-block" id="pgSqlPanel">' +
-            '<h2>SQL</h2>' +
-            '<textarea id="learnerSql" class="code" spellcheck="false" placeholder="SELECT … / CREATE TABLE … / .tables">' +
-            escapeHtml(exercise.starter_sql || '') + '</textarea>' +
-            '<div class="btn-row">' +
-            '<button type="button" id="btnRun" class="btn btn-primary">Run SQL</button>' +
-            '<span class="muted">Ctrl/⌘+Enter</span>' +
+            '<section class="dbg-panel cli-term" id="pgCliPanel" aria-label="SQLite command line">' +
+            '<div class="cli-scroll" id="cliScroll"></div>' +
+            '<div class="cli-input-row">' +
+            '<label class="cli-prompt" id="cliPrompt" for="cliInput">sqlite&gt;</label>' +
+            '<input type="text" id="cliInput" class="cli-input" spellcheck="false" autocomplete="off" ' +
+            'autocapitalize="off" autocorrect="off" aria-label="SQL input">' +
             '</div>' +
-            '</section>' +
-            '<section class="dbg-panel result-section">' +
-            '<div class="result-header"><h2>Result</h2><span id="runStatus" class="status"></span></div>' +
-            '<div id="runPanel"></div>' +
             '</section>';
 
         document.getElementById('btnToggleDbPanel').addEventListener('click', function () {
@@ -827,37 +830,336 @@
                 localStorage.setItem(collapseKey, collapsed ? '1' : '0');
             } catch (ignore) {}
         });
-        document.getElementById('btnRun').addEventListener('click', playgroundRun);
-        bindSqlRunShortcut(playgroundRun);
         document.getElementById('btnResetDb').addEventListener('click', playgroundReset);
         document.getElementById('btnSaveLocal').addEventListener('click', playgroundSaveLocal);
         document.getElementById('btnLoadLocal').addEventListener('click', playgroundLoadLocal);
         document.getElementById('btnDownloadDb').addEventListener('click', playgroundDownload);
         document.getElementById('btnUploadDb').addEventListener('click', playgroundUpload);
-        setStatus(document.getElementById('runStatus'), 'pending', 'Loading database…');
+
+        cliInit();
+        setStatus(document.getElementById('runStatus'), 'pending', 'Loading…');
         ensurePlaygroundDb()
             .then(function () {
-                setStatus(document.getElementById('runStatus'), 'success', 'Database ready');
+                setStatus(document.getElementById('runStatus'), 'success', 'Ready');
+                cliAppendSys('Database ready. Enter ".help" for usage hints.');
+                cliFocusInput();
             })
             .catch(function (e) {
-                showError(document.getElementById('runPanel'), document.getElementById('runStatus'), e);
+                setStatus(document.getElementById('runStatus'), 'error', 'Error');
+                cliAppendErr(e.message || String(e));
             });
     }
 
-    function playgroundRun(ev) {
-        if (ev && ev.preventDefault) ev.preventDefault();
-        var snap = captureSqlEditorView();
-        var sql = document.getElementById('learnerSql').value;
-        var status = document.getElementById('runStatus');
-        var panel = document.getElementById('runPanel');
-        if (!sql.trim()) {
-            setStatus(status, 'error', 'Enter a SQL statement first.');
-            restoreSqlEditorView(snap);
+    // ---- Playground CLI (sqlite3-style Easy REPL) ----
+    var cliPending = '';
+    var cliHistory = [];
+    var cliHistIdx = -1;
+    var cliHistDraft = '';
+    var cliBusy = false;
+
+    function cliScrollEl() {
+        return document.getElementById('cliScroll');
+    }
+
+    function cliInputEl() {
+        return document.getElementById('cliInput');
+    }
+
+    function cliFocusInput() {
+        var input = cliInputEl();
+        if (!input) return;
+        try {
+            input.focus({ preventScroll: true });
+        } catch (e) {
+            input.focus();
+        }
+    }
+
+    function cliSetPrompt(continuation) {
+        var el = document.getElementById('cliPrompt');
+        if (!el) return;
+        el.textContent = continuation ? '   ...>' : 'sqlite>';
+    }
+
+    function cliAppendRaw(html) {
+        var scroll = cliScrollEl();
+        if (!scroll) return;
+        var div = document.createElement('div');
+        div.className = 'cli-line';
+        div.innerHTML = html;
+        scroll.appendChild(div);
+        scroll.scrollTop = scroll.scrollHeight;
+    }
+
+    function cliAppendEcho(promptText, line) {
+        cliAppendRaw(
+            '<span class="cli-echo-prompt">' + escapeHtml(promptText) + '</span> ' +
+            '<span class="cli-echo-cmd">' + escapeHtml(line) + '</span>'
+        );
+    }
+
+    function cliAppendOut(text) {
+        if (text === '' || text == null) return;
+        cliAppendRaw('<pre class="cli-out">' + escapeHtml(String(text)) + '</pre>');
+    }
+
+    function cliAppendSys(text) {
+        cliAppendRaw('<div class="cli-sys">' + escapeHtml(String(text)) + '</div>');
+    }
+
+    function cliAppendErr(text) {
+        cliAppendRaw('<pre class="cli-err">' + escapeHtml(String(text)) + '</pre>');
+    }
+
+    function formatResultText(result) {
+        if (!result) return '';
+        if (result.text) return String(result.text);
+        if (!result.columns || (result.columns.length === 0 && (!result.rows || !result.rows.length))) {
+            return '';
+        }
+        var cols = result.columns;
+        var rows = result.rows || [];
+        var widths = cols.map(function (c) { return String(c).length; });
+        rows.forEach(function (row) {
+            row.forEach(function (cell, i) {
+                var s = cell === null ? 'NULL' : String(cell);
+                if (s.length > widths[i]) widths[i] = s.length;
+            });
+        });
+        // Cap very wide columns for readability
+        widths = widths.map(function (w) { return Math.min(w, 40); });
+
+        function pad(s, w) {
+            s = String(s);
+            if (s.length > w) return s.slice(0, w - 1) + '…';
+            return s + new Array(w - s.length + 1).join(' ');
+        }
+
+        var lines = [];
+        lines.push(cols.map(function (c, i) { return pad(c, widths[i]); }).join('  '));
+        lines.push(widths.map(function (w) { return new Array(w + 1).join('-'); }).join('  '));
+        rows.forEach(function (row) {
+            lines.push(row.map(function (cell, i) {
+                return pad(cell === null ? 'NULL' : cell, widths[i]);
+            }).join('  '));
+        });
+        return lines.join('\n');
+    }
+
+    function formatWorkerOutput(data) {
+        var parts = [];
+        if (data.notice) parts.push(String(data.notice));
+        if (data.results && data.results.length) {
+            data.results.forEach(function (r) {
+                var t = formatResultText(r);
+                if (t) parts.push(t);
+            });
+        } else if (data.result) {
+            var t = formatResultText(data.result);
+            if (t) parts.push(t);
+            else if (data.phase === 'execute' || data.phase === 'meta') {
+                // DDL / empty result — sqlite3 is quiet; stay quiet
+            }
+        }
+        return parts.join('\n\n');
+    }
+
+    function cliIsComplete(sql) {
+        var t = String(sql || '').trim();
+        if (!t) return true;
+        if (t.charAt(0) === '.' || t.charAt(0) === '\\') return true;
+        return /;\s*$/.test(t);
+    }
+
+    function cliInit() {
+        cliPending = '';
+        cliHistory = [];
+        cliHistIdx = -1;
+        cliHistDraft = '';
+        cliBusy = false;
+        cliSetPrompt(false);
+        var scroll = cliScrollEl();
+        if (scroll) {
+            scroll.innerHTML = '';
+            scroll.setAttribute('tabindex', '-1');
+        }
+        cliAppendSys('SQLite (DBGrader playground)');
+        cliAppendSys('Enter SQL ending with ;  —  or meta-commands like .tables / .help');
+        cliAppendSys('Select scrollback text to copy; paste into the prompt with Ctrl/⌘+V.');
+        var input = cliInputEl();
+        if (!input) return;
+        input.value = '';
+        input.addEventListener('keydown', cliOnKeyDown);
+        input.addEventListener('paste', cliOnPaste);
+
+        // Allow drag-select + copy from scrollback; only refocus prompt on plain clicks.
+        var selectingInScroll = false;
+        if (scroll) {
+            scroll.addEventListener('mousedown', function () {
+                selectingInScroll = true;
+            });
+        }
+        document.addEventListener('mouseup', function () {
+            if (!selectingInScroll) return;
+            selectingInScroll = false;
+            var sel = window.getSelection && window.getSelection();
+            var selected = sel && String(sel.toString());
+            if (selected && selected.length) {
+                // Keep selection focusable for Ctrl/⌘+C (not the input field).
+                if (scroll) {
+                    try {
+                        scroll.focus({ preventScroll: true });
+                    } catch (e) {
+                        scroll.focus();
+                    }
+                }
+                return;
+            }
+            cliFocusInput();
+        });
+
+        var panel = document.getElementById('pgCliPanel');
+        if (panel) {
+            panel.addEventListener('mousedown', function (ev) {
+                if (!ev.target) return;
+                if (ev.target.id === 'cliInput' || (ev.target.closest && ev.target.closest('.cli-input-row'))) {
+                    return;
+                }
+                if (scroll && scroll.contains(ev.target)) {
+                    return; // handled on mouseup
+                }
+            });
+        }
+    }
+
+    function cliSelectionText() {
+        var sel = window.getSelection && window.getSelection();
+        return sel ? String(sel.toString()) : '';
+    }
+
+    function cliOnPaste(ev) {
+        var input = cliInputEl();
+        if (!input || !ev.clipboardData) return;
+        var text = ev.clipboardData.getData('text');
+        if (!text || (text.indexOf('\n') < 0 && text.indexOf('\r') < 0)) {
+            return; // let the browser paste a single line
+        }
+        ev.preventDefault();
+        var normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        var start = input.selectionStart;
+        var end = input.selectionEnd;
+        var merged = input.value.slice(0, start) + normalized + input.value.slice(end);
+        var parts = merged.split('\n');
+        var last = parts.pop();
+        input.value = '';
+        var chain = Promise.resolve();
+        parts.forEach(function (line) {
+            chain = chain.then(function () {
+                return cliSubmitLine(line);
+            });
+        });
+        chain.then(function () {
+            input.value = last || '';
+            try {
+                input.setSelectionRange(input.value.length, input.value.length);
+            } catch (ignore) {}
+            cliFocusInput();
+        });
+    }
+
+    function cliOnKeyDown(ev) {
+        var input = cliInputEl();
+        if (!input) return;
+
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            if (cliBusy) return;
+            cliSubmitLine(input.value);
             return;
         }
-        setStatus(status, 'pending', 'Running…');
-        panel.innerHTML = '';
-        ensurePlaygroundDb()
+
+        if (ev.key === 'ArrowUp') {
+            ev.preventDefault();
+            if (!cliHistory.length) return;
+            if (cliHistIdx < 0) {
+                cliHistDraft = input.value;
+                cliHistIdx = cliHistory.length - 1;
+            } else if (cliHistIdx > 0) {
+                cliHistIdx -= 1;
+            }
+            input.value = cliHistory[cliHistIdx];
+            input.setSelectionRange(input.value.length, input.value.length);
+            return;
+        }
+
+        if (ev.key === 'ArrowDown') {
+            ev.preventDefault();
+            if (cliHistIdx < 0) return;
+            if (cliHistIdx < cliHistory.length - 1) {
+                cliHistIdx += 1;
+                input.value = cliHistory[cliHistIdx];
+            } else {
+                cliHistIdx = -1;
+                input.value = cliHistDraft;
+            }
+            input.setSelectionRange(input.value.length, input.value.length);
+            return;
+        }
+
+        if (ev.key === 'c' && (ev.ctrlKey || ev.metaKey) && !ev.shiftKey) {
+            // Prefer copying a scrollback selection over ^C cancel.
+            if (cliSelectionText()) {
+                return;
+            }
+            if (!input.value && cliPending) {
+                ev.preventDefault();
+                cliPending = '';
+                cliSetPrompt(false);
+                cliAppendSys('^C');
+            }
+        }
+    }
+
+    function cliSubmitLine(line) {
+        var input = cliInputEl();
+        var promptText = cliPending ? '   ...>' : 'sqlite>';
+        var rawLine = String(line || '');
+        cliAppendEcho(promptText, rawLine);
+
+        if (input && document.activeElement === input) {
+            input.value = '';
+        }
+        cliHistIdx = -1;
+        cliHistDraft = '';
+
+        var next = cliPending ? (cliPending + '\n' + rawLine) : rawLine;
+        if (!String(next).trim()) {
+            cliPending = '';
+            cliSetPrompt(false);
+            cliFocusInput();
+            return Promise.resolve();
+        }
+
+        if (!cliIsComplete(next)) {
+            cliPending = next;
+            cliSetPrompt(true);
+            cliFocusInput();
+            return Promise.resolve();
+        }
+
+        cliPending = '';
+        cliSetPrompt(false);
+        var sql = next.trim();
+        if (cliHistory[cliHistory.length - 1] !== sql) {
+            cliHistory.push(sql);
+            if (cliHistory.length > 100) cliHistory.shift();
+        }
+        return cliExec(sql);
+    }
+
+    function cliExec(sql) {
+        cliBusy = true;
+        return ensurePlaygroundDb()
             .then(function () {
                 return callWorker('playground', {
                     op: 'exec',
@@ -868,33 +1170,38 @@
             })
             .then(function (data) {
                 rememberPlaygroundBytes(data.db_bytes);
-                var label = data.phase === 'meta' ? 'Meta: ' + (data.meta || 'ok') : 'Success';
-                showResult(panel, status, 'success', label, data.result, null, data.results, data.notice);
-                restoreSqlEditorView(snap);
+                var out = formatWorkerOutput(data);
+                if (out) cliAppendOut(out);
             })
             .catch(function (err) {
-                showError(panel, status, err);
-                restoreSqlEditorView(snap);
+                cliAppendErr(err.message || String(err));
+            })
+            .then(function () {
+                cliBusy = false;
+                cliFocusInput();
             });
     }
 
     function playgroundReset() {
         var status = document.getElementById('runStatus');
-        var panel = document.getElementById('runPanel');
         if (!window.confirm('Reset the playground database? This cannot be undone.')) {
             return;
         }
         setStatus(status, 'pending', 'Resetting…');
-        panel.innerHTML = '';
         playgroundReady = null;
         callWorker('playground', { op: 'reset', exercise: exercise, db_bytes: null })
             .then(function (data) {
                 rememberPlaygroundBytes(data.db_bytes);
                 playgroundReady = Promise.resolve(playgroundBytes);
-                showResult(panel, status, 'success', 'Database reset', data.result, null, data.results);
+                cliPending = '';
+                cliSetPrompt(false);
+                setStatus(status, 'success', 'Ready');
+                cliAppendSys('Database reset.');
+                cliFocusInput();
             })
             .catch(function (err) {
-                showError(panel, status, err);
+                setStatus(status, 'error', 'Error');
+                cliAppendErr(err.message || String(err));
             });
     }
 
@@ -932,11 +1239,11 @@
         ensurePlaygroundDb()
             .then(function () {
                 if (!playgroundBytes || !playgroundBytes.byteLength) {
-                    setStatus(status, 'error', 'Database is empty — nothing to save.');
+                    setStatus(status, 'error', 'Empty');
+                    cliAppendErr('Database is empty — nothing to save.');
                     return;
                 }
                 var b64 = arrayBufferToBase64(playgroundBytes);
-                // base64 is ~4/3 of binary; warn near common 5MB localStorage budgets
                 if (b64.length > 3.5 * 1024 * 1024) {
                     if (!window.confirm(
                         'This snapshot is about ' + formatBytes(b64.length) +
@@ -947,45 +1254,46 @@
                 }
                 try {
                     localStorage.setItem(playgroundLocalKey(), b64);
-                    setStatus(
-                        status,
-                        'success',
-                        'Saved to localStorage (' + formatBytes(playgroundBytes.byteLength) +
-                        ' DB → ' + formatBytes(b64.length) + ' stored)'
-                    );
+                    var msg = 'Saved to localStorage (' + formatBytes(playgroundBytes.byteLength) +
+                        ' DB → ' + formatBytes(b64.length) + ' stored)';
+                    setStatus(status, 'success', 'Saved');
+                    cliAppendSys(msg);
                 } catch (e) {
-                    var msg = (e && e.name === 'QuotaExceededError')
+                    var msg2 = (e && e.name === 'QuotaExceededError')
                         ? 'localStorage is full (quota exceeded). Use Download instead, or clear other site data.'
                         : (e.message || String(e));
-                    setStatus(status, 'error', msg);
+                    setStatus(status, 'error', 'Error');
+                    cliAppendErr(msg2);
                 }
             })
             .catch(function (err) {
-                setStatus(status, 'error', err.message || String(err));
+                setStatus(status, 'error', 'Error');
+                cliAppendErr(err.message || String(err));
             });
     }
 
     function playgroundLoadLocal() {
         var status = document.getElementById('runStatus');
-        var panel = document.getElementById('runPanel');
         var b64 = null;
         try {
             b64 = localStorage.getItem(playgroundLocalKey());
         } catch (e) {
-            setStatus(status, 'error', e.message || String(e));
+            setStatus(status, 'error', 'Error');
+            cliAppendErr(e.message || String(e));
             return;
         }
         if (!b64) {
-            setStatus(status, 'error', 'No localStorage snapshot for this placement yet. Use Save first.');
+            setStatus(status, 'error', 'None');
+            cliAppendErr('No localStorage snapshot for this placement yet. Use Save first.');
             return;
         }
-        setStatus(status, 'pending', 'Reloading from localStorage…');
-        panel.innerHTML = '';
+        setStatus(status, 'pending', 'Loading…');
         var buf;
         try {
             buf = base64ToArrayBuffer(b64);
         } catch (e) {
-            setStatus(status, 'error', 'Could not decode localStorage snapshot.');
+            setStatus(status, 'error', 'Error');
+            cliAppendErr('Could not decode localStorage snapshot.');
             return;
         }
         callWorker('playground', {
@@ -996,10 +1304,13 @@
             .then(function (data) {
                 rememberPlaygroundBytes(data.db_bytes);
                 playgroundReady = Promise.resolve(playgroundBytes);
-                showResult(panel, status, 'success', 'Reloaded from localStorage', data.result, null, data.results);
+                setStatus(status, 'success', 'Ready');
+                cliAppendSys('Reloaded from localStorage.');
+                cliFocusInput();
             })
             .catch(function (err) {
-                showError(panel, status, err);
+                setStatus(status, 'error', 'Error');
+                cliAppendErr(err.message || String(err));
             });
     }
 
@@ -1008,7 +1319,8 @@
         ensurePlaygroundDb()
             .then(function () {
                 if (!playgroundBytes || !playgroundBytes.byteLength) {
-                    setStatus(status, 'error', 'Database is empty — nothing to download yet.');
+                    setStatus(status, 'error', 'Empty');
+                    cliAppendErr('Database is empty — nothing to download yet.');
                     return;
                 }
                 var blob = new Blob([playgroundBytes], { type: 'application/x-sqlite3' });
@@ -1020,10 +1332,12 @@
                 a.click();
                 a.remove();
                 setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-                setStatus(status, 'success', 'Download started');
+                setStatus(status, 'success', 'Ready');
+                cliAppendSys('Download started.');
             })
             .catch(function (err) {
-                setStatus(status, 'error', err.message || String(err));
+                setStatus(status, 'error', 'Error');
+                cliAppendErr(err.message || String(err));
             });
     }
 
@@ -1031,14 +1345,13 @@
         var fileInput = document.getElementById('playgroundFile');
         var file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
         var status = document.getElementById('runStatus');
-        var panel = document.getElementById('runPanel');
         var err = validateUploadFile(file);
         if (err) {
-            setStatus(status, 'error', err);
+            setStatus(status, 'error', 'Error');
+            cliAppendErr(err);
             return;
         }
         setStatus(status, 'pending', 'Importing…');
-        panel.innerHTML = '';
         readFileAsArrayBuffer(file)
             .then(function (buf) {
                 return callWorker('playground', {
@@ -1050,10 +1363,13 @@
             .then(function (data) {
                 rememberPlaygroundBytes(data.db_bytes);
                 playgroundReady = Promise.resolve(playgroundBytes);
-                showResult(panel, status, 'success', 'Imported', data.result, null, data.results);
+                setStatus(status, 'success', 'Ready');
+                cliAppendSys('Imported ' + (file.name || 'database') + '.');
+                cliFocusInput();
             })
             .catch(function (e) {
-                showError(panel, status, e);
+                setStatus(status, 'error', 'Error');
+                cliAppendErr(e.message || String(e));
             });
     }
 

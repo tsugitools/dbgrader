@@ -227,8 +227,9 @@ function runMeta(db, submissionSql) {
         if (job.result) {
             return {
                 label: job.label,
-                columns: job.result.columns,
-                rows: job.result.rows
+                columns: job.result.columns || null,
+                rows: job.result.rows || null,
+                text: job.result.text || null
             };
         }
         // Prefer dedicated table listing with counts (upload + SQL explore).
