@@ -589,35 +589,6 @@ textarea.code {
     font-size: 1.05rem;
 }
 
-.dbg-modal-tabs {
-    display: flex;
-    gap: 0.25rem;
-    padding: 0.5rem 1rem 0;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-}
-
-.dbg-tab {
-    appearance: none;
-    border: none;
-    background: transparent;
-    color: var(--muted);
-    font: inherit;
-    font-weight: 600;
-    font-size: 0.85rem;
-    padding: 0.45rem 0.75rem;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-}
-
-.dbg-tab:hover { color: var(--text); }
-
-.dbg-tab.active {
-    color: var(--accent-2);
-    border-bottom-color: var(--accent);
-}
-
 .prompt-block .instructions-link,
 .dbg-collapse-body .instructions-link {
     margin: 0.5rem 0 0;

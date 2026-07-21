@@ -11,12 +11,12 @@
  */
 
 $assignments = array(
+    'PlaygroundExercise' => 'SQL Playground',
     'PantryExercise' => 'Pantry Items Over 30 Ounces',
     'SimpleWhereExercise' => 'A Simple Query with a WHERE clause',
     'PollsExercise' => 'Polls Loading One-to-Many Data',
     'ModelsExercise' => 'Django Models — Local Library Catalog',
     'UnescoExercise' => 'Unesco Batch Loading One-to-Many Data',
-    'PlaygroundExercise' => 'SQL Playground',
 );
 
 /**

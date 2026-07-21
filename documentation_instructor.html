@@ -35,7 +35,7 @@
                 <li>For database-state, add <strong>Verification SQL</strong> (semicolon-separated)</li>
                 <li><strong>Run query / Run verification preview</strong> to validate instructor SQL</li>
                 <li><strong>Save</strong> to the placement JSON</li>
-                <li><strong>View Assignment JSON</strong> — copy the exercise or a <code>lessons.json</code> custom snippet</li>
+                <li><strong>View Assignment JSON</strong> — copy the exercise object</li>
             </ol>
 
             <div class="tip">
@@ -149,8 +149,6 @@ SELECT COUNT(*) FROM orders;</div>
     "json": { /* exercise object */ }
   }
 ]</div>
-            <p><strong>Edit</strong> → <strong>View Assignment JSON</strong> → <strong>lessons.json custom</strong> produces
-               the <code>exercise</code> key snippet when a built-in is selected, otherwise the full <code>config</code> object.</p>
         </div>
 
         <div id="grading" class="tab-content">

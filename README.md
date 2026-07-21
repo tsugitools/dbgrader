@@ -37,7 +37,7 @@ As instructor, open **Edit** (or `index.php?mode=author`):
 3. Optionally set **Starter SQL** for the learner editor
 4. **Run query** to preview expected results
 6. **Save** to the placement JSON
-7. **View Assignment JSON** — copy the exercise object, or the `lessons.json` `custom` snippet (`exercise` key for built-ins, or full `config` JSON)
+7. **View Assignment JSON** — copy the exercise object
 
 ### Preload from lessons.json
 

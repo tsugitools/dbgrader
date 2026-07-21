@@ -338,10 +338,6 @@
             '<h2 id="jsonModalTitle">Assignment JSON</h2>' +
             '<button type="button" class="btn btn-ghost" data-close-json aria-label="Close">Close</button>' +
             '</div>' +
-            '<div class="dbg-modal-tabs" role="tablist">' +
-            '<button type="button" class="dbg-tab active" data-json-tab="assignment" role="tab" aria-selected="true">Assignment JSON</button>' +
-            '<button type="button" class="dbg-tab" data-json-tab="custom" role="tab" aria-selected="false">lessons.json custom</button>' +
-            '</div>' +
             '<pre id="jsonModalBody" class="dbg-json-body"></pre>' +
             '<div class="dbg-modal-footer">' +
             '<button type="button" id="btnCopyJson" class="btn btn-secondary">Copy</button>' +
@@ -363,72 +359,16 @@
         jsonModal.querySelectorAll('[data-close-json]').forEach(function (el) {
             el.addEventListener('click', closeJsonModal);
         });
-        jsonModal.querySelectorAll('[data-json-tab]').forEach(function (el) {
-            el.addEventListener('click', function () {
-                setJsonModalTab(el.getAttribute('data-json-tab'));
-            });
-        });
-    }
-
-    var jsonModalTab = 'assignment';
-
-    function buildLessonsCustomSnippet(ex) {
-        // Prefer built-in key (CA4E-style) when this placement uses a catalog assignment.
-        var key = cfg.assignmentKey || (ex && ex.builtin) || null;
-        if (key) {
-            return {
-                custom: [
-                    {
-                        key: 'exercise',
-                        value: key
-                    }
-                ]
-            };
-        }
-        return {
-            custom: [
-                {
-                    key: 'config',
-                    json: ex
-                }
-            ]
-        };
     }
 
     function jsonModalText() {
-        var ex = collectExerciseFromForm();
-        if (jsonModalTab === 'custom') {
-            return JSON.stringify(buildLessonsCustomSnippet(ex), null, 2);
-        }
-        return JSON.stringify(ex, null, 2);
-    }
-
-    function refreshJsonModalBody() {
-        var body = document.getElementById('jsonModalBody');
-        if (body) body.textContent = jsonModalText();
-    }
-
-    function setJsonModalTab(tab) {
-        jsonModalTab = tab === 'custom' ? 'custom' : 'assignment';
-        var modal = document.getElementById('jsonModal');
-        if (!modal) return;
-        modal.querySelectorAll('[data-json-tab]').forEach(function (el) {
-            var on = el.getAttribute('data-json-tab') === jsonModalTab;
-            el.classList.toggle('active', on);
-            el.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-        var title = document.getElementById('jsonModalTitle');
-        if (title) {
-            title.textContent = jsonModalTab === 'custom'
-                ? 'lessons.json custom snippet'
-                : 'Assignment JSON';
-        }
-        refreshJsonModalBody();
+        return JSON.stringify(collectExerciseFromForm(), null, 2);
     }
 
     function openJsonModal() {
         var modal = document.getElementById('jsonModal');
-        setJsonModalTab(jsonModalTab || 'assignment');
+        var body = document.getElementById('jsonModalBody');
+        if (body) body.textContent = jsonModalText();
         modal.hidden = false;
     }
 
