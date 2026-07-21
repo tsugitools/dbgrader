@@ -145,7 +145,9 @@ function runMeta(db, submissionSql) {
         dialect: meta.dialect || null,
         notice: meta.dialect === 'mysql'
             ? 'MySQL command converted to SQLite'
-            : null,
+            : (meta.dialect === 'postgresql'
+                ? 'PostgreSQL command converted to SQLite'
+                : null),
         result: results[0],
         results: results
     };

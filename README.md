@@ -53,7 +53,7 @@ If the LMS dropped customs, `?inherit=<resource_link_id>` reloads that block fro
 ## Learner
 
 1. Read the prompt
-2. **Run** exploratory queries (not graded) — including `.tables`, `SHOW TABLES`, `DESCRIBE table` / `DESC table`, `SHOW CREATE TABLE`, `SHOW INDEX FROM table`, `.help`
+2. **Run** exploratory queries (not graded) — including `.tables`, `SHOW TABLES`, `\dt`, `\d table`, `\di`, `\dv`, `\l`, `DESCRIBE table` / `DESC table`, `SHOW CREATE TABLE`, `.help` / `\?`
 3. **Check Answer** to grade:
    - **query** mode: compare SELECT result to the solution
    - **database-state** mode: run your (possibly multi-statement) SQL, then compare verification queries

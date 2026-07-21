@@ -1,37 +1,78 @@
 /**
- * Shell / MySQL-style exploration commands for DBGrader (learner Run only).
+ * Shell / MySQL / psql-style exploration commands for DBGrader (learner Run only).
  * Not accepted as graded Check Answer submissions.
  */
 (function (global) {
     'use strict';
 
     var HELP_TEXT = [
-        '.tables / SHOW TABLES              List tables',
-        '.schema [table]                    Show CREATE statements',
-        '.indexes [table]                   List indexes',
-        '.databases / SHOW DATABASES        Show attached databases',
-        '.columns table / DESCRIBE table    Column info (PRAGMA table_info)',
-        '.foreignkeys table                 Foreign keys',
-        '.describe table                    Columns, indexes, and foreign keys',
-        'SHOW CREATE TABLE table            CREATE statement',
-        'SHOW INDEX FROM table              Indexes for a table',
-        '.help                              This help'
+        '.tables / SHOW TABLES / \\dt       List tables',
+        '.schema [table] / \\d [table]      Schema / describe relation',
+        '.indexes [table] / \\di            List indexes',
+        '\\dv                               List views',
+        '.databases / SHOW DATABASES / \\l  Show database (:memory:)',
+        '.columns table / DESCRIBE table   Column info (PRAGMA table_info)',
+        '.describe table                   Columns, indexes, and foreign keys',
+        'SHOW CREATE TABLE table           CREATE statement',
+        'SHOW INDEX FROM table             Indexes for a table',
+        '.help / \\?                        This help'
     ];
 
     function firstStatement(input) {
         var text = String(input || '').trim();
         if (!text) return '';
-        // Single exploration command — take first line, strip trailing semicolon
         var firstLine = text.split(/\r?\n/)[0].trim().replace(/;+\s*$/, '');
         return firstLine;
     }
 
+    function stripQuotes(name) {
+        if (!name) return null;
+        return String(name).replace(/^[`"']+|[`"']+$/g, '');
+    }
+
+    function mapPsql(cmd, arg, raw) {
+        var base = { raw: raw, dialect: 'postgresql' };
+
+        if (cmd === '?' || cmd === 'h' || cmd === 'help') {
+            return Object.assign({ name: 'help', arg: null }, base);
+        }
+        if (cmd === 'dt') {
+            return Object.assign({ name: 'tables', arg: null }, base);
+        }
+        if (cmd === 'di') {
+            return Object.assign({ name: 'indexes', arg: arg }, base);
+        }
+        if (cmd === 'dv') {
+            return Object.assign({ name: 'views', arg: null }, base);
+        }
+        if (cmd === 'l' || cmd === 'list') {
+            return Object.assign({ name: 'databases', arg: null }, base);
+        }
+        // \d with no arg → list relations; with arg → rich describe
+        if (cmd === 'd') {
+            if (arg) {
+                return Object.assign({ name: 'describe', arg: arg }, base);
+            }
+            return Object.assign({ name: 'relations', arg: null }, base);
+        }
+        return null;
+    }
+
     /**
-     * Normalize shell (.) and easy MySQL explorers into { name, arg, raw, dialect }.
+     * Normalize shell (.), MySQL, and psql explorers into { name, arg, raw, dialect }.
      */
     function parseMeta(input) {
         var raw = firstStatement(input);
         if (!raw) return null;
+
+        // psql-style (\dt, \d table, \di, \dv, \l, \?)
+        if (raw.charAt(0) === '\\') {
+            var psql = raw.match(/^\\([?a-zA-Z]+)[+S]?(?:\s+(\S+))?/);
+            if (!psql) return null;
+            var cmd = psql[1].toLowerCase();
+            var arg = psql[2] ? stripQuotes(psql[2]) : null;
+            return mapPsql(cmd, arg, raw);
+        }
 
         // SQLite shell-style
         if (raw.charAt(0) === '.') {
@@ -95,11 +136,6 @@
         return null;
     }
 
-    function stripQuotes(name) {
-        if (!name) return null;
-        return String(name).replace(/^[`"']+|[`"']+$/g, '');
-    }
-
     function isMeta(input) {
         return !!parseMeta(input);
     }
@@ -114,13 +150,9 @@
 
     function likePatternSql(like) {
         if (!like) return null;
-        // LIKE 'foo' or LIKE foo — already stripped quotes in parse
         return quoteString(like);
     }
 
-    /**
-     * Map a meta-command to one or more { label, sql } jobs.
-     */
     function expandMeta(meta) {
         var name = meta.name;
         var arg = meta.arg;
@@ -144,6 +176,23 @@
             }
             tablesSql += ' ORDER BY name';
             return [{ label: 'tables', sql: tablesSql }];
+        }
+
+        if (name === 'views') {
+            return [{
+                label: 'views',
+                sql: "SELECT name AS 'View' FROM sqlite_schema " +
+                    "WHERE type = 'view' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            }];
+        }
+
+        if (name === 'relations') {
+            return [{
+                label: 'relations',
+                sql: "SELECT name AS 'Name', type AS 'Type' FROM sqlite_schema " +
+                    "WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' " +
+                    "ORDER BY type, name"
+            }];
         }
 
         if (name === 'schema') {
@@ -207,7 +256,7 @@
         }
 
         if (name === 'describe') {
-            if (!arg) throw metaError('.describe requires a table name');
+            if (!arg) throw metaError('.describe / \\d requires a table name');
             var qi = quoteIdent(arg);
             var qs = quoteString(arg);
             return [
@@ -231,7 +280,7 @@
             ];
         }
 
-        throw metaError('Unknown exploration command (try .help)');
+        throw metaError('Unknown exploration command (try .help or \\?)');
     }
 
     function metaError(message) {

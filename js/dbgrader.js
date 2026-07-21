@@ -387,8 +387,8 @@
         document.getElementById('exerciseTitle').textContent = exercise.title || 'SQL exercise';
         var mode = exercise.mode === 'database-state' ? 'database-state' : 'query';
         var modeNote = mode === 'database-state'
-            ? '<p class="mode-note">Mode: <strong>database-state</strong> — your SQL may include multiple statements. Grading checks verification queries. Explore with <code>SHOW TABLES</code>, <code>DESCRIBE table</code>, or <code>.help</code>.</p>'
-            : '<p class="mode-note">Mode: <strong>query</strong> — write a SELECT whose result matches the solution. Explore with <code>.tables</code>, <code>SHOW TABLES</code>, <code>DESCRIBE table</code>, or <code>.help</code> (not graded).</p>';
+            ? '<p class="mode-note">Mode: <strong>database-state</strong> — your SQL may include multiple statements. Grading checks verification queries. Explore with <code>SHOW TABLES</code>, <code>\\dt</code>, <code>DESCRIBE table</code>, or <code>.help</code>.</p>'
+            : '<p class="mode-note">Mode: <strong>query</strong> — write a SELECT whose result matches the solution. Explore with <code>.tables</code>, <code>SHOW TABLES</code>, <code>\\dt</code>, <code>DESCRIBE table</code>, or <code>.help</code> (not graded).</p>';
         app.innerHTML =
             '<section class="prompt-block">' +
             '<h1>' + escapeHtml(exercise.title || 'SQL exercise') + '</h1>' +
