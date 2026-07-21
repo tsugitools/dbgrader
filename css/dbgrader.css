@@ -18,6 +18,9 @@
 
 * { box-sizing: border-box; }
 
+/* Author styles like .pane { display: flex } beat the UA [hidden] rule. */
+[hidden] { display: none !important; }
+
 body {
     margin: 0;
     min-height: 100vh;
@@ -101,7 +104,6 @@ body {
     margin-top: 1rem;
 }
 
-.verify-block[hidden] { display: none !important; }
 
 .verify-block h2 {
     margin: 0 0 0.5rem;
@@ -225,6 +227,72 @@ textarea.code {
     margin-bottom: 1rem;
 }
 
+.dbg-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+}
+
+.dbg-collapsible {
+    padding: 0;
+    overflow: hidden;
+}
+
+.dbg-collapse-toggle {
+    appearance: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.65rem 0.9rem;
+    border: 0;
+    background: var(--panel-2);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.dbg-collapse-toggle:hover {
+    background: #dde5ee;
+}
+
+.dbg-collapse-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dbg-collapse-chevron::before {
+    content: '▾';
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+}
+
+.dbg-collapsible.is-collapsed .dbg-collapse-chevron::before {
+    transform: rotate(-90deg);
+}
+
+.dbg-collapse-body {
+    padding: 0.85rem 1rem 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.dbg-collapse-body .prompt {
+    margin-bottom: 0.75rem;
+}
+
+.dbg-collapse-body .btn-row-tight {
+    margin-top: 0.5rem;
+}
+
 .btn-row, .actions {
     display: flex;
     gap: 0.5rem;
@@ -287,7 +355,7 @@ textarea.code {
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.75rem 1rem 1rem;
-    margin-top: 1rem;
+    margin-top: 0;
 }
 
 .result-header {
@@ -349,7 +417,6 @@ textarea.code {
 
 .muted { color: var(--muted); font-size: 0.9rem; }
 
-.dbg-modal[hidden] { display: none !important; }
 
 .dbg-modal {
     position: fixed;
@@ -432,17 +499,20 @@ textarea.code {
     border-bottom-color: var(--accent);
 }
 
-.prompt-block .instructions-link {
+.prompt-block .instructions-link,
+.dbg-collapse-body .instructions-link {
     margin: 0.5rem 0 0;
 }
 
-.prompt-block .instructions-link a {
+.prompt-block .instructions-link a,
+.dbg-collapse-body .instructions-link a {
     color: var(--accent);
     font-weight: 600;
     text-decoration: none;
 }
 
-.prompt-block .instructions-link a:hover {
+.prompt-block .instructions-link a:hover,
+.dbg-collapse-body .instructions-link a:hover {
     text-decoration: underline;
     color: var(--accent-2);
 }
@@ -453,13 +523,14 @@ textarea.code {
     font-size: 1.05rem;
 }
 
-.upload-label {
-    display: grid;
-    gap: 0.35rem;
-    font-size: 0.85rem;
-    color: var(--muted);
-    margin: 0.75rem 0 1rem;
+.upload-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
 }
+
 
 .upload-label input[type="file"] {
     color: var(--text);

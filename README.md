@@ -83,8 +83,9 @@ If the LMS dropped customs, `?inherit=<resource_link_id>` reloads the `config` b
 | `query` | Result of learner SELECT vs solution SELECT |
 | `database-state` | Results of `verification_sql` after solution vs after learner SQL |
 | `upload-check` | Same `verification_sql` on expected reference DB vs uploaded SQLite file |
+| `playground` | Persistent in-browser SQL admin (Run / Reset / Upload / Download); not graded |
 
-Built-in upload example: **PollsExercise** (`Polls Loading One-to-Many Data`).
+Built-in upload examples: **PollsExercise**, **ModelsExercise**, **UnescoExercise**. Built-in admin: **PlaygroundExercise**.
 
 ## Install
 

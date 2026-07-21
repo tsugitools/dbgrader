@@ -50,7 +50,9 @@ $mode = isset($exercise['mode']) ? $exercise['mode'] : 'query';
 $verify = isset($exercise['verification_sql']) ? $exercise['verification_sql'] : null;
 $hasVerify = is_array($verify) ? count($verify) > 0 : (is_string($verify) && strlen(trim($verify)) > 0);
 
-if ($mode === 'upload-check') {
+if ($mode === 'playground') {
+    // Prompt required above; setup_sql optional (applied on Reset).
+} else if ($mode === 'upload-check') {
     if (!$hasVerify) {
         http_response_code(400);
         echo json_encode(array('status' => 'failure', 'detail' => 'upload-check mode requires verification_sql'));

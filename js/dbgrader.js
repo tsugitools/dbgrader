@@ -56,7 +56,7 @@
     }
 
     function normalizeMode(m) {
-        if (m === 'database-state' || m === 'upload-check') return m;
+        if (m === 'database-state' || m === 'upload-check' || m === 'playground') return m;
         return 'query';
     }
 
@@ -143,6 +143,45 @@
         el.textContent = text;
     }
 
+    /** Keep the SQL editor focused and the viewport stable after Run updates the Result panel. */
+    function captureSqlEditorView() {
+        var ta = document.getElementById('learnerSql');
+        if (!ta) return null;
+        return {
+            ta: ta,
+            selStart: ta.selectionStart,
+            selEnd: ta.selectionEnd,
+            taScroll: ta.scrollTop,
+            winScrollX: window.scrollX,
+            winScrollY: window.scrollY
+        };
+    }
+
+    function restoreSqlEditorView(snap) {
+        if (!snap || !snap.ta || !document.contains(snap.ta)) return;
+        try {
+            snap.ta.focus({ preventScroll: true });
+        } catch (e) {
+            snap.ta.focus();
+        }
+        try {
+            snap.ta.setSelectionRange(snap.selStart, snap.selEnd);
+        } catch (ignore) {}
+        snap.ta.scrollTop = snap.taScroll;
+        window.scrollTo(snap.winScrollX, snap.winScrollY);
+    }
+
+    function bindSqlRunShortcut(runFn) {
+        var ta = document.getElementById('learnerSql');
+        if (!ta) return;
+        ta.addEventListener('keydown', function (ev) {
+            if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+                ev.preventDefault();
+                runFn(ev);
+            }
+        });
+    }
+
     function showResult(panel, statusEl, kind, label, result, feedback, results, notice) {
         setStatus(statusEl, kind, label);
         var fb = '';
@@ -191,9 +230,14 @@
         if (!modeEl || !verifyBlock) return;
         var mode = normalizeMode(modeEl.value);
         var needsVerify = mode === 'database-state' || mode === 'upload-check';
+        var isPlayground = mode === 'playground';
         verifyBlock.hidden = !needsVerify;
         if (starterBlock) {
-            starterBlock.hidden = mode === 'upload-check';
+            starterBlock.hidden = mode === 'upload-check' || isPlayground;
+        }
+        var solutionPane = document.getElementById('solutionPane');
+        if (solutionPane) {
+            solutionPane.hidden = isPlayground;
         }
         if (solutionHint) {
             solutionHint.textContent = mode === 'upload-check'
@@ -201,7 +245,9 @@
                 : 'learner goal SQL';
         }
         if (setupHint) {
-            if (mode === 'upload-check') {
+            if (isPlayground) {
+                setupHint.textContent = 'optional schema applied when learners Reset';
+            } else if (mode === 'upload-check') {
                 setupHint.textContent = 'expected reference DB (CREATE/INSERT)';
             } else if (mode === 'database-state') {
                 setupHint.textContent = 'setup.sql (optional in database-state)';
@@ -217,7 +263,12 @@
         }
         var runBtn = document.getElementById('btnRun');
         if (runBtn) {
-            runBtn.textContent = needsVerify ? 'Run verification preview' : 'Run query';
+            if (isPlayground) {
+                runBtn.hidden = true;
+            } else {
+                runBtn.hidden = false;
+                runBtn.textContent = needsVerify ? 'Run verification preview' : 'Run query';
+            }
         }
     }
 
@@ -239,13 +290,15 @@
             '>database-state — compare verification queries after DDL/DML</option>' +
             '<option value="upload-check"' + (mode === 'upload-check' ? ' selected' : '') +
             '>upload-check — upload SQLite file; compare verification queries</option>' +
+            '<option value="playground"' + (mode === 'playground' ? ' selected' : '') +
+            '>playground — persistent SQL admin (no grading)</option>' +
             '</select></label>' +
             '<label id="starterBlock">Starter SQL for learners <span class="hint">(shown in their editor; leave blank for empty)</span>' +
             '<textarea id="exStarter" class="code" rows="4" spellcheck="false">' +
             escapeHtml(exercise.starter_sql || '') + '</textarea></label>' +
             '</section>' +
             '<section class="split">' +
-            '<div class="pane">' +
+            '<div class="pane" id="solutionPane">' +
             '<h2>Solution <span class="hint" id="solutionHint">learner goal SQL</span></h2>' +
             '<textarea id="exSolution" class="code" spellcheck="false">' +
             escapeHtml(exercise.solution_sql || '') + '</textarea>' +
@@ -407,7 +460,7 @@
     function collectExerciseFromForm() {
         var mode = normalizeMode(document.getElementById('exMode').value);
         var verification = textToVerification(document.getElementById('exVerify').value);
-        var compatibility = (mode === 'database-state' || mode === 'upload-check')
+        var compatibility = (mode === 'database-state' || mode === 'upload-check' || mode === 'playground')
             ? ['dbgrader']
             : (exercise.compatibility || ['dbgrader', 'udemy']);
         var starterEl = document.getElementById('exStarter');
@@ -416,6 +469,7 @@
         if (instructionsEl) {
             instructionsUrl = instructionsEl.value.trim();
         }
+        var solutionEl = document.getElementById('exSolution');
         var out = {
             version: exercise.version || 1,
             type: 'sqlite',
@@ -424,7 +478,7 @@
             prompt: document.getElementById('exPrompt').value,
             instructions_url: instructionsUrl,
             setup_sql: document.getElementById('exSetup').value,
-            solution_sql: document.getElementById('exSolution').value,
+            solution_sql: solutionEl ? solutionEl.value : (exercise.solution_sql || ''),
             starter_sql: starterEl ? starterEl.value : (exercise.starter_sql || ''),
             verification_sql: verification,
             hints: exercise.hints || [],
@@ -451,6 +505,11 @@
         var ex = collectExerciseFromForm();
         var status = document.getElementById('runStatus');
         var panel = document.getElementById('runPanel');
+        if (ex.mode === 'playground') {
+            setStatus(status, 'pending', 'Playground is not graded — open Learner to run SQL.');
+            panel.innerHTML = '';
+            return;
+        }
         if ((ex.mode === 'database-state' || ex.mode === 'upload-check')
             && (!ex.verification_sql || !ex.verification_sql.length)) {
             setStatus(status, 'error', 'Add at least one verification query for ' + ex.mode + ' mode.');
@@ -543,6 +602,10 @@
             renderLearnerUpload();
             return;
         }
+        if (normalizeMode(exercise.mode) === 'playground') {
+            renderLearnerPlayground();
+            return;
+        }
         app.innerHTML =
             '<section class="prompt-block">' +
             '<h1>' + escapeHtml(exercise.title || 'SQL exercise') + '</h1>' +
@@ -565,6 +628,7 @@
             '</section>';
 
         document.getElementById('btnRun').addEventListener('click', learnerRun);
+        bindSqlRunShortcut(learnerRun);
         document.getElementById('btnCheck').addEventListener('click', learnerCheck);
         document.getElementById('btnReset').addEventListener('click', function () {
             document.getElementById('learnerSql').value = exercise.starter_sql || '';
@@ -599,6 +663,398 @@
 
         document.getElementById('btnExplore').addEventListener('click', learnerExploreUpload);
         document.getElementById('btnCheck').addEventListener('click', learnerCheckUpload);
+    }
+
+    // ---- Playground (persistent SQL admin) ----
+    var playgroundBytes = null;
+    var playgroundReady = null;
+
+    function playgroundPersistKey() {
+        return (cfg.urls && cfg.urls.persistKey) || 'dbgrader-playground';
+    }
+
+    function idbOpen() {
+        return new Promise(function (resolve, reject) {
+            if (!window.indexedDB) {
+                reject(new Error('IndexedDB is not available in this browser.'));
+                return;
+            }
+            var req = indexedDB.open('dbgrader', 1);
+            req.onupgradeneeded = function () {
+                var db = req.result;
+                if (!db.objectStoreNames.contains('playground')) {
+                    db.createObjectStore('playground');
+                }
+            };
+            req.onsuccess = function () { resolve(req.result); };
+            req.onerror = function () { reject(req.error || new Error('IndexedDB open failed')); };
+        });
+    }
+
+    function idbGetBytes() {
+        return idbOpen().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction('playground', 'readonly');
+                var store = tx.objectStore('playground');
+                var req = store.get(playgroundPersistKey());
+                req.onsuccess = function () {
+                    resolve(req.result || null);
+                };
+                req.onerror = function () { reject(req.error); };
+            });
+        }).catch(function () {
+            return null;
+        });
+    }
+
+    function idbSetBytes(buf) {
+        return idbOpen().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction('playground', 'readwrite');
+                var store = tx.objectStore('playground');
+                store.put(buf, playgroundPersistKey());
+                tx.oncomplete = function () { resolve(); };
+                tx.onerror = function () { reject(tx.error); };
+            });
+        }).catch(function () {
+            // Persistence is best-effort.
+        });
+    }
+
+    function idbClearBytes() {
+        return idbOpen().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction('playground', 'readwrite');
+                tx.objectStore('playground').delete(playgroundPersistKey());
+                tx.oncomplete = function () { resolve(); };
+                tx.onerror = function () { reject(tx.error); };
+            });
+        }).catch(function () {});
+    }
+
+    function rememberPlaygroundBytes(buf) {
+        if (!buf) return;
+        playgroundBytes = buf;
+        idbSetBytes(buf);
+    }
+
+    function copyBuffer(buf) {
+        if (!buf) return null;
+        if (buf instanceof ArrayBuffer) return buf.slice(0);
+        if (buf.buffer) {
+            return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+        }
+        return null;
+    }
+
+    function ensurePlaygroundDb() {
+        if (playgroundReady) return playgroundReady;
+        playgroundReady = idbGetBytes().then(function (stored) {
+            if (stored && stored.byteLength) {
+                playgroundBytes = stored instanceof ArrayBuffer ? stored : copyBuffer(stored);
+                return playgroundBytes;
+            }
+            return callWorker('playground', {
+                op: 'reset',
+                exercise: exercise,
+                db_bytes: null
+            }).then(function (data) {
+                rememberPlaygroundBytes(data.db_bytes);
+                return playgroundBytes;
+            });
+        });
+        return playgroundReady;
+    }
+
+    function renderLearnerPlayground() {
+        var title = exercise.title || 'SQL Playground';
+        var collapseKey = playgroundPersistKey() + '-db-collapsed';
+        var startCollapsed = false;
+        try {
+            startCollapsed = localStorage.getItem(collapseKey) === '1';
+        } catch (ignore) {}
+
+        app.innerHTML =
+            '<section class="dbg-panel dbg-collapsible' + (startCollapsed ? ' is-collapsed' : '') + '" id="pgDbPanel">' +
+            '<button type="button" class="dbg-collapse-toggle" id="btnToggleDbPanel" aria-expanded="' +
+            (startCollapsed ? 'false' : 'true') + '" aria-controls="pgDbPanelBody">' +
+            '<span class="dbg-collapse-title">' + escapeHtml(title) + ' · Database</span>' +
+            '<span class="dbg-collapse-chevron" aria-hidden="true"></span>' +
+            '</button>' +
+            '<div class="dbg-collapse-body" id="pgDbPanelBody"' + (startCollapsed ? ' hidden' : '') + '>' +
+            '<p class="prompt">' + escapeHtml(exercise.prompt || '') + '</p>' +
+            instructionsLinkHtml(exercise) +
+            '<div class="btn-row btn-row-tight">' +
+            '<button type="button" id="btnResetDb" class="btn btn-ghost">Reset database</button>' +
+            '<button type="button" id="btnSaveLocal" class="btn btn-secondary">Save to localStorage</button>' +
+            '<button type="button" id="btnLoadLocal" class="btn btn-secondary">Reload from localStorage</button>' +
+            '<button type="button" id="btnDownloadDb" class="btn btn-secondary">Download SQLite</button>' +
+            '</div>' +
+            '<div class="upload-row">' +
+            '<label class="upload-label">Upload SQLite' +
+            '<input id="playgroundFile" type="file" accept=".sqlite3,.sqlite,.db,application/x-sqlite3">' +
+            '</label>' +
+            '<button type="button" id="btnUploadDb" class="btn btn-secondary">Import file</button>' +
+            '</div>' +
+            '<p class="muted">Live DB persists in IndexedDB for this placement. ' +
+            '<strong>Save to localStorage</strong> stores a snapshot (fine for small DBs; browsers usually allow ~5MB total per site). ' +
+            'Use Download/Upload for larger files.</p>' +
+            '</div>' +
+            '</section>' +
+            '<section class="dbg-panel editor-block" id="pgSqlPanel">' +
+            '<h2>SQL</h2>' +
+            '<textarea id="learnerSql" class="code" spellcheck="false" placeholder="SELECT … / CREATE TABLE … / .tables">' +
+            escapeHtml(exercise.starter_sql || '') + '</textarea>' +
+            '<div class="btn-row">' +
+            '<button type="button" id="btnRun" class="btn btn-primary">Run SQL</button>' +
+            '<span class="muted">Ctrl/⌘+Enter</span>' +
+            '</div>' +
+            '</section>' +
+            '<section class="dbg-panel result-section">' +
+            '<div class="result-header"><h2>Result</h2><span id="runStatus" class="status"></span></div>' +
+            '<div id="runPanel"></div>' +
+            '</section>';
+
+        document.getElementById('btnToggleDbPanel').addEventListener('click', function () {
+            var panel = document.getElementById('pgDbPanel');
+            var body = document.getElementById('pgDbPanelBody');
+            var btn = document.getElementById('btnToggleDbPanel');
+            var collapsed = !panel.classList.contains('is-collapsed');
+            panel.classList.toggle('is-collapsed', collapsed);
+            body.hidden = collapsed;
+            btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            try {
+                localStorage.setItem(collapseKey, collapsed ? '1' : '0');
+            } catch (ignore) {}
+        });
+        document.getElementById('btnRun').addEventListener('click', playgroundRun);
+        bindSqlRunShortcut(playgroundRun);
+        document.getElementById('btnResetDb').addEventListener('click', playgroundReset);
+        document.getElementById('btnSaveLocal').addEventListener('click', playgroundSaveLocal);
+        document.getElementById('btnLoadLocal').addEventListener('click', playgroundLoadLocal);
+        document.getElementById('btnDownloadDb').addEventListener('click', playgroundDownload);
+        document.getElementById('btnUploadDb').addEventListener('click', playgroundUpload);
+        setStatus(document.getElementById('runStatus'), 'pending', 'Loading database…');
+        ensurePlaygroundDb()
+            .then(function () {
+                setStatus(document.getElementById('runStatus'), 'success', 'Database ready');
+            })
+            .catch(function (e) {
+                showError(document.getElementById('runPanel'), document.getElementById('runStatus'), e);
+            });
+    }
+
+    function playgroundRun(ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        var snap = captureSqlEditorView();
+        var sql = document.getElementById('learnerSql').value;
+        var status = document.getElementById('runStatus');
+        var panel = document.getElementById('runPanel');
+        if (!sql.trim()) {
+            setStatus(status, 'error', 'Enter a SQL statement first.');
+            restoreSqlEditorView(snap);
+            return;
+        }
+        setStatus(status, 'pending', 'Running…');
+        panel.innerHTML = '';
+        ensurePlaygroundDb()
+            .then(function () {
+                return callWorker('playground', {
+                    op: 'exec',
+                    exercise: exercise,
+                    submission_sql: sql,
+                    db_bytes: copyBuffer(playgroundBytes)
+                });
+            })
+            .then(function (data) {
+                rememberPlaygroundBytes(data.db_bytes);
+                var label = data.phase === 'meta' ? 'Meta: ' + (data.meta || 'ok') : 'Success';
+                showResult(panel, status, 'success', label, data.result, null, data.results, data.notice);
+                restoreSqlEditorView(snap);
+            })
+            .catch(function (err) {
+                showError(panel, status, err);
+                restoreSqlEditorView(snap);
+            });
+    }
+
+    function playgroundReset() {
+        var status = document.getElementById('runStatus');
+        var panel = document.getElementById('runPanel');
+        if (!window.confirm('Reset the playground database? This cannot be undone.')) {
+            return;
+        }
+        setStatus(status, 'pending', 'Resetting…');
+        panel.innerHTML = '';
+        playgroundReady = null;
+        callWorker('playground', { op: 'reset', exercise: exercise, db_bytes: null })
+            .then(function (data) {
+                rememberPlaygroundBytes(data.db_bytes);
+                playgroundReady = Promise.resolve(playgroundBytes);
+                showResult(panel, status, 'success', 'Database reset', data.result, null, data.results);
+            })
+            .catch(function (err) {
+                showError(panel, status, err);
+            });
+    }
+
+    function playgroundLocalKey() {
+        return playgroundPersistKey() + '-ls';
+    }
+
+    function arrayBufferToBase64(buf) {
+        var u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+        var chunk = 0x8000;
+        var parts = [];
+        for (var i = 0; i < u8.length; i += chunk) {
+            parts.push(String.fromCharCode.apply(null, u8.subarray(i, i + chunk)));
+        }
+        return btoa(parts.join(''));
+    }
+
+    function base64ToArrayBuffer(b64) {
+        var bin = atob(b64);
+        var u8 = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) {
+            u8[i] = bin.charCodeAt(i);
+        }
+        return u8.buffer;
+    }
+
+    function formatBytes(n) {
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function playgroundSaveLocal() {
+        var status = document.getElementById('runStatus');
+        ensurePlaygroundDb()
+            .then(function () {
+                if (!playgroundBytes || !playgroundBytes.byteLength) {
+                    setStatus(status, 'error', 'Database is empty — nothing to save.');
+                    return;
+                }
+                var b64 = arrayBufferToBase64(playgroundBytes);
+                // base64 is ~4/3 of binary; warn near common 5MB localStorage budgets
+                if (b64.length > 3.5 * 1024 * 1024) {
+                    if (!window.confirm(
+                        'This snapshot is about ' + formatBytes(b64.length) +
+                        ' as text. localStorage is often limited to ~5MB per site and may fail. Continue?'
+                    )) {
+                        return;
+                    }
+                }
+                try {
+                    localStorage.setItem(playgroundLocalKey(), b64);
+                    setStatus(
+                        status,
+                        'success',
+                        'Saved to localStorage (' + formatBytes(playgroundBytes.byteLength) +
+                        ' DB → ' + formatBytes(b64.length) + ' stored)'
+                    );
+                } catch (e) {
+                    var msg = (e && e.name === 'QuotaExceededError')
+                        ? 'localStorage is full (quota exceeded). Use Download instead, or clear other site data.'
+                        : (e.message || String(e));
+                    setStatus(status, 'error', msg);
+                }
+            })
+            .catch(function (err) {
+                setStatus(status, 'error', err.message || String(err));
+            });
+    }
+
+    function playgroundLoadLocal() {
+        var status = document.getElementById('runStatus');
+        var panel = document.getElementById('runPanel');
+        var b64 = null;
+        try {
+            b64 = localStorage.getItem(playgroundLocalKey());
+        } catch (e) {
+            setStatus(status, 'error', e.message || String(e));
+            return;
+        }
+        if (!b64) {
+            setStatus(status, 'error', 'No localStorage snapshot for this placement yet. Use Save first.');
+            return;
+        }
+        setStatus(status, 'pending', 'Reloading from localStorage…');
+        panel.innerHTML = '';
+        var buf;
+        try {
+            buf = base64ToArrayBuffer(b64);
+        } catch (e) {
+            setStatus(status, 'error', 'Could not decode localStorage snapshot.');
+            return;
+        }
+        callWorker('playground', {
+            op: 'import',
+            exercise: exercise,
+            db_bytes: buf
+        })
+            .then(function (data) {
+                rememberPlaygroundBytes(data.db_bytes);
+                playgroundReady = Promise.resolve(playgroundBytes);
+                showResult(panel, status, 'success', 'Reloaded from localStorage', data.result, null, data.results);
+            })
+            .catch(function (err) {
+                showError(panel, status, err);
+            });
+    }
+
+    function playgroundDownload() {
+        var status = document.getElementById('runStatus');
+        ensurePlaygroundDb()
+            .then(function () {
+                if (!playgroundBytes || !playgroundBytes.byteLength) {
+                    setStatus(status, 'error', 'Database is empty — nothing to download yet.');
+                    return;
+                }
+                var blob = new Blob([playgroundBytes], { type: 'application/x-sqlite3' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'playground.sqlite3';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                setStatus(status, 'success', 'Download started');
+            })
+            .catch(function (err) {
+                setStatus(status, 'error', err.message || String(err));
+            });
+    }
+
+    function playgroundUpload() {
+        var fileInput = document.getElementById('playgroundFile');
+        var file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        var status = document.getElementById('runStatus');
+        var panel = document.getElementById('runPanel');
+        var err = validateUploadFile(file);
+        if (err) {
+            setStatus(status, 'error', err);
+            return;
+        }
+        setStatus(status, 'pending', 'Importing…');
+        panel.innerHTML = '';
+        readFileAsArrayBuffer(file)
+            .then(function (buf) {
+                return callWorker('playground', {
+                    op: 'import',
+                    exercise: exercise,
+                    db_bytes: buf
+                });
+            })
+            .then(function (data) {
+                rememberPlaygroundBytes(data.db_bytes);
+                playgroundReady = Promise.resolve(playgroundBytes);
+                showResult(panel, status, 'success', 'Imported', data.result, null, data.results);
+            })
+            .catch(function (e) {
+                showError(panel, status, e);
+            });
     }
 
     function getSelectedUploadFile() {
@@ -673,12 +1129,15 @@
             });
     }
 
-    function learnerRun() {
+    function learnerRun(ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        var snap = captureSqlEditorView();
         var sql = document.getElementById('learnerSql').value;
         var status = document.getElementById('runStatus');
         var panel = document.getElementById('runPanel');
         if (!sql.trim()) {
             setStatus(status, 'error', 'Enter a SQL statement first.');
+            restoreSqlEditorView(snap);
             return;
         }
         setStatus(status, 'pending', 'Running…');
@@ -687,9 +1146,11 @@
             .then(function (data) {
                 var label = data.phase === 'meta' ? 'Meta: ' + (data.meta || 'ok') : 'Success';
                 showResult(panel, status, 'success', label, data.result, null, data.results, data.notice);
+                restoreSqlEditorView(snap);
             })
             .catch(function (err) {
                 showError(panel, status, err);
+                restoreSqlEditorView(snap);
             });
     }
 

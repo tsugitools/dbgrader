@@ -16,6 +16,7 @@ $assignments = array(
     'PollsExercise' => 'Polls Loading One-to-Many Data',
     'ModelsExercise' => 'Django Models — Local Library Catalog',
     'UnescoExercise' => 'Unesco Batch Loading One-to-Many Data',
+    'PlaygroundExercise' => 'SQL Playground',
 );
 
 /**

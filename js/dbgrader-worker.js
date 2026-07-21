@@ -21,6 +21,7 @@ var sqlite3Promise = null;
 
 // sqlite3.h — may not be exported on all wasm builds
 var SQLITE_DESERIALIZE_FREEONCLOSE = 1;
+var SQLITE_DESERIALIZE_RESIZEABLE = 2;
 var SQLITE_DESERIALIZE_READONLY = 4;
 
 function loadSqlite3(sqliteBase) {
@@ -43,10 +44,10 @@ function openDb(sqlite3) {
 }
 
 /**
- * Open an uploaded SQLite database image read-only via deserialize.
- * @param {Uint8Array|ArrayBuffer} bytes
+ * Open a SQLite database image via deserialize.
+ * @param {boolean} writable - when true, allow mutations (playground); else read-only (upload-check).
  */
-function openDbFromBytes(sqlite3, bytes) {
+function openDbFromBytes(sqlite3, bytes, writable) {
     var u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
     if (u8.byteLength < 16) {
         var shortErr = new Error('Uploaded file is too small to be a SQLite database.');
@@ -67,11 +68,16 @@ function openDbFromBytes(sqlite3, bytes) {
     var p = null;
     try {
         p = sqlite3.wasm.allocFromTypedArray(u8);
-        var flags = SQLITE_DESERIALIZE_FREEONCLOSE | SQLITE_DESERIALIZE_READONLY;
-        if (typeof sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE === 'number') {
-            flags = sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
-                | sqlite3.capi.SQLITE_DESERIALIZE_READONLY;
-        }
+        var freeFlag = typeof sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE === 'number'
+            ? sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
+            : SQLITE_DESERIALIZE_FREEONCLOSE;
+        var roFlag = typeof sqlite3.capi.SQLITE_DESERIALIZE_READONLY === 'number'
+            ? sqlite3.capi.SQLITE_DESERIALIZE_READONLY
+            : SQLITE_DESERIALIZE_READONLY;
+        var resizeFlag = typeof sqlite3.capi.SQLITE_DESERIALIZE_RESIZEABLE === 'number'
+            ? sqlite3.capi.SQLITE_DESERIALIZE_RESIZEABLE
+            : SQLITE_DESERIALIZE_RESIZEABLE;
+        var flags = freeFlag | (writable ? resizeFlag : roFlag);
         var rc = sqlite3.capi.sqlite3_deserialize(
             db.pointer,
             'main',
@@ -95,9 +101,21 @@ function openDbFromBytes(sqlite3, bytes) {
     }
 }
 
+/**
+ * Serialize DB to a transferable ArrayBuffer (SQLite file image).
+ */
+function exportDbBytes(sqlite3, db) {
+    var u8 = sqlite3.capi.sqlite3_js_db_export(db.pointer);
+    if (!u8 || !u8.byteLength) {
+        // Empty DB still needs a valid header — open/export again via temp if needed.
+        return new ArrayBuffer(0);
+    }
+    return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+}
+
 function exerciseMode(exercise) {
     var m = exercise && exercise.mode;
-    if (m === 'database-state' || m === 'upload-check') return m;
+    if (m === 'database-state' || m === 'upload-check' || m === 'playground') return m;
     return 'query';
 }
 
@@ -294,6 +312,25 @@ function listTablesWithRowCounts(db, like) {
 }
 function handlePreview(sqlite3, exercise) {
     var mode = exerciseMode(exercise);
+    if (mode === 'playground') {
+        var pdb = openDb(sqlite3);
+        try {
+            if (exercise && exercise.setup_sql && String(exercise.setup_sql).trim()) {
+                runSetup(pdb, exercise.setup_sql);
+            }
+            return {
+                execution_ok: true,
+                phase: 'preview',
+                mode: mode,
+                result: {
+                    columns: ['status'],
+                    rows: [['Playground has no solution SQL. Use Learner view to run SQL.']]
+                }
+            };
+        } finally {
+            pdb.close();
+        }
+    }
     if (mode === 'upload-check' || mode === 'database-state') {
         var gdb = buildGoldDb(sqlite3, exercise);
         try {
@@ -339,7 +376,7 @@ function handleExecute(sqlite3, exercise, submissionSql, dbBytes) {
             missing.phase = 'submission';
             throw missing;
         }
-        db = openDbFromBytes(sqlite3, dbBytes);
+        db = openDbFromBytes(sqlite3, dbBytes, false);
         try {
             if (self.DBGraderMeta.isMeta(submissionSql)) {
                 return runMeta(db, submissionSql);
@@ -400,7 +437,7 @@ function gradeUploadCheck(sqlite3, exercise, dbBytes) {
         gold.close();
     }
 
-    var uploaded = openDbFromBytes(sqlite3, dbBytes);
+    var uploaded = openDbFromBytes(sqlite3, dbBytes, false);
     try {
         actualList = runVerifications(uploaded, exercise.verification_sql, 'upload-check mode');
     } finally {
@@ -435,6 +472,12 @@ function handleGrade(sqlite3, exercise, submissionSql, dbBytes) {
 
     if (mode === 'upload-check') {
         return gradeUploadCheck(sqlite3, exercise, dbBytes);
+    }
+
+    if (mode === 'playground') {
+        var pgErr = new Error('Playground mode is not graded. Use Run SQL instead.');
+        pgErr.phase = 'submission';
+        throw pgErr;
     }
 
     if (self.DBGraderMeta.isMeta(submissionSql)) {
@@ -530,6 +573,95 @@ function handleGrade(sqlite3, exercise, submissionSql, dbBytes) {
     };
 }
 
+/**
+ * Playground: mutable DB round-trip. Always returns updated db_bytes for persistence.
+ * op: reset | import | exec
+ */
+function handlePlayground(sqlite3, exercise, op, submissionSql, dbBytes) {
+    var db;
+    var resultPayload = null;
+
+    if (op === 'reset' || (op === 'exec' && !dbBytes)) {
+        db = openDb(sqlite3);
+        try {
+            if (exercise && exercise.setup_sql && String(exercise.setup_sql).trim()) {
+                runSetup(db, exercise.setup_sql);
+            }
+            if (op === 'exec' && submissionSql && String(submissionSql).trim()) {
+                if (self.DBGraderMeta.isMeta(submissionSql)) {
+                    resultPayload = runMeta(db, submissionSql);
+                } else {
+                    var r0 = runSql(db, submissionSql, 'submission');
+                    resultPayload = {
+                        execution_ok: true,
+                        phase: 'execute',
+                        mode: 'playground',
+                        result: r0
+                    };
+                }
+            } else {
+                resultPayload = {
+                    execution_ok: true,
+                    phase: 'reset',
+                    mode: 'playground',
+                    result: { columns: ['status'], rows: [['Database reset']] }
+                };
+            }
+            var bytes0 = exportDbBytes(sqlite3, db);
+            resultPayload.db_bytes = bytes0;
+            return resultPayload;
+        } finally {
+            db.close();
+        }
+    }
+
+    if (op === 'import') {
+        if (!dbBytes) {
+            var miss = new Error('Choose a SQLite database file to import.');
+            miss.phase = 'submission';
+            throw miss;
+        }
+        db = openDbFromBytes(sqlite3, dbBytes, true);
+        try {
+            var bytes1 = exportDbBytes(sqlite3, db);
+            return {
+                execution_ok: true,
+                phase: 'import',
+                mode: 'playground',
+                result: { columns: ['status'], rows: [['Database imported']] },
+                db_bytes: bytes1
+            };
+        } finally {
+            db.close();
+        }
+    }
+
+    // exec with existing bytes
+    db = openDbFromBytes(sqlite3, dbBytes, true);
+    try {
+        if (!submissionSql || !String(submissionSql).trim()) {
+            var empty = new Error('Enter a SQL statement first.');
+            empty.phase = 'submission';
+            throw empty;
+        }
+        if (self.DBGraderMeta.isMeta(submissionSql)) {
+            resultPayload = runMeta(db, submissionSql);
+        } else {
+            var r1 = runSql(db, submissionSql, 'submission');
+            resultPayload = {
+                execution_ok: true,
+                phase: 'execute',
+                mode: 'playground',
+                result: r1
+            };
+        }
+        resultPayload.db_bytes = exportDbBytes(sqlite3, db);
+        return resultPayload;
+    } finally {
+        db.close();
+    }
+}
+
 self.onmessage = function (ev) {
     var msg = ev.data || {};
     var id = msg.id;
@@ -541,6 +673,7 @@ self.onmessage = function (ev) {
             var sql = msg.submission_sql || '';
             var dbBytes = msg.db_bytes || null;
             var out;
+            var transfer = [];
 
             if (action === 'preview') {
                 out = handlePreview(sqlite3, exercise);
@@ -548,6 +681,8 @@ self.onmessage = function (ev) {
                 out = handleExecute(sqlite3, exercise, sql, dbBytes);
             } else if (action === 'grade') {
                 out = handleGrade(sqlite3, exercise, sql, dbBytes);
+            } else if (action === 'playground') {
+                out = handlePlayground(sqlite3, exercise, msg.op || 'exec', sql, dbBytes);
             } else if (action === 'ping') {
                 out = {
                     execution_ok: true,
@@ -557,7 +692,14 @@ self.onmessage = function (ev) {
                 throw new Error('Unknown action: ' + action);
             }
 
-            self.postMessage({ id: id, ok: true, data: out });
+            if (out && out.db_bytes && out.db_bytes instanceof ArrayBuffer) {
+                transfer.push(out.db_bytes);
+            }
+            if (transfer.length) {
+                self.postMessage({ id: id, ok: true, data: out }, transfer);
+            } else {
+                self.postMessage({ id: id, ok: true, data: out });
+            }
         })
         .catch(function (e) {
             self.postMessage({

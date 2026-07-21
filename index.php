@@ -60,6 +60,7 @@ $saveUrl = addSession('save.php');
 $sqliteBase = rtrim($CFG->staticroot, '/') . '/js/sqlite/sqlite-wasm-3530300/jswasm/';
 $assetBust = dbgrader_asset_bust();
 $workerUrl = 'js/dbgrader-worker.js?v=' . $assetBust;
+$persistKey = 'dbgrader-pg-' . (isset($LINK) && $LINK && !empty($LINK->id) ? (string) $LINK->id : 'anon');
 
 $OUTPUT->suppressSiteNav();
 $OUTPUT->header();
@@ -111,7 +112,8 @@ window.DBGRADER = {
         gradeSubmit: <?php echo json_encode($gradeSubmitUrl); ?>,
         recordAttempt: <?php echo json_encode($recordAttemptUrl); ?>,
         sqliteBase: <?php echo json_encode($sqliteBase); ?>,
-        worker: <?php echo json_encode($workerUrl); ?>
+        worker: <?php echo json_encode($workerUrl); ?>,
+        persistKey: <?php echo json_encode($persistKey); ?>
     }
 };
 </script>

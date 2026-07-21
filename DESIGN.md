@@ -262,6 +262,16 @@ Prefer count and filtered verification queries over dumping entire tables so vol
 
 Upload-check exercises are DBGrader-only (`compatibility: ["dbgrader"]`).
 
+### Playground Mode
+
+Playground mode is an ungraded in-browser SQLite admin:
+
+1. Opens (or creates) a persistent database for the placement (IndexedDB in the learner browser);
+2. Runs learner SQL (and explore meta-commands) against that database;
+3. Supports Reset (optional `setup_sql` reapplied), Upload `.sqlite3`, and Download `.sqlite3`.
+
+Playground exercises are DBGrader-only (`compatibility: ["dbgrader"]`).
+
 ## Exercise JSON Format
 
 Initial format:
