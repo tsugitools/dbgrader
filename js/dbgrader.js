@@ -143,7 +143,7 @@
 
     // ---- Author view ----
     function renderAuthor() {
-        document.getElementById('exerciseTitle').textContent = exercise.title || 'Author exercise';
+        document.getElementById('exerciseTitle').textContent = exercise.title || 'Edit exercise';
         var mode = exercise.mode === 'database-state' ? 'database-state' : 'query';
         app.innerHTML =
             '<section class="author-meta">' +
@@ -371,7 +371,7 @@
             .then(function (res) {
                 if (res.ok && res.j.status === 'success') {
                     exercise = ex;
-                    document.getElementById('exerciseTitle').textContent = ex.title || 'Author exercise';
+                    document.getElementById('exerciseTitle').textContent = ex.title || 'Edit exercise';
                     msg.textContent = 'Saved.';
                 } else {
                     msg.textContent = (res.j && res.j.detail) || 'Save failed.';
@@ -385,15 +385,10 @@
     // ---- Learner view ----
     function renderLearner() {
         document.getElementById('exerciseTitle').textContent = exercise.title || 'SQL exercise';
-        var mode = exercise.mode === 'database-state' ? 'database-state' : 'query';
-        var modeNote = mode === 'database-state'
-            ? '<p class="mode-note">Mode: <strong>database-state</strong> — your SQL may include multiple statements. Grading checks verification queries. Explore with <code>SHOW TABLES</code>, <code>\\dt</code>, <code>DESCRIBE table</code>, or <code>.help</code>.</p>'
-            : '<p class="mode-note">Mode: <strong>query</strong> — write a SELECT whose result matches the solution. Explore with <code>.tables</code>, <code>SHOW TABLES</code>, <code>\\dt</code>, <code>DESCRIBE table</code>, or <code>.help</code> (not graded).</p>';
         app.innerHTML =
             '<section class="prompt-block">' +
             '<h1>' + escapeHtml(exercise.title || 'SQL exercise') + '</h1>' +
             '<p class="prompt">' + escapeHtml(exercise.prompt || '') + '</p>' +
-            modeNote +
             '</section>' +
             '<section class="editor-block">' +
             '<h2>Your SQL</h2>' +

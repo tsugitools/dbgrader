@@ -250,6 +250,24 @@ textarea.code {
     color: var(--text);
 }
 
+/* Selected Edit / Learner — unique class avoids Bootstrap .active clashes */
+.topbar a.btn.dbg-nav-current {
+    background: #0b6bcb !important;
+    border: 2px solid #084d94 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(11, 107, 203, 0.35);
+    font-weight: 700;
+}
+
+.topbar a.btn.btn-ghost:not(.dbg-nav-current) {
+    opacity: 0.8;
+}
+
+.topbar a.btn.dbg-nav-current:hover {
+    background: #095aa8 !important;
+    color: #ffffff !important;
+}
+
 .result-section {
     background: var(--panel);
     border: 1px solid var(--border);

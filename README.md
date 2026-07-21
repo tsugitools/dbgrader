@@ -10,7 +10,7 @@ Interactive SQL autograder for Tsugi. Runs SQLite in the browser via WebAssembly
 
 PHP is intentionally thin (same idea as [ca4e CMOS](https://github.com/csev/ca4e)):
 
-- `index.php` — LTI session, inject `window.DBGRADER`, HTML shell (Author / Learner / Student Data / Settings)
+- `index.php` — LTI session, inject `window.DBGRADER`, HTML shell (Edit / Learner / Student Data / Settings)
 - `save.php` — instructor saves exercise JSON to `lti_link.json`
 - `grades.php` — student data (linked from the index top bar)
 - `js/` — authoring UI, learner UI, SQLite worker, comparison
@@ -30,7 +30,7 @@ Built from `$CFG->staticroot` (default `https://static.tsugi.org`):
 
 ## Authoring
 
-As instructor, open **Author** (or `index.php?mode=author`):
+As instructor, open **Edit** (or `index.php?mode=author`):
 
 1. Edit title and prompt
 2. Write **setup.sql** (left as Evaluation) and **solution.sql**

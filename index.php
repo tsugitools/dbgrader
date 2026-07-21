@@ -59,11 +59,13 @@ if ($isInstructor) {
         <span id="exerciseTitle" class="exercise-title"></span>
     </div>
     <div class="topbar-right">
+<?php if ($isInstructor) : ?>
+        <a class="btn btn-ghost<?php echo $mode === 'learner' ? ' dbg-nav-current' : ''; ?>" href="<?php echo addSession('index.php'); ?>">Learner</a>
+        <a class="btn btn-ghost<?php echo $mode === 'author' ? ' dbg-nav-current' : ''; ?>" href="<?php echo addSession('index.php?mode=author'); ?>">Edit</a>
+<?php endif; ?>
         <a class="btn btn-ghost" href="documentation.html" target="_blank" rel="noopener noreferrer" title="Help">Help</a>
 <?php if ($isInstructor) : ?>
         <a class="btn btn-ghost" href="documentation_instructor.html" target="_blank" rel="noopener noreferrer" title="Instructor documentation">Instructor Help</a>
-        <a class="btn btn-ghost" href="<?php echo addSession('index.php?mode=author'); ?>">Author</a>
-        <a class="btn btn-ghost" href="<?php echo addSession('index.php'); ?>">Learner</a>
         <a class="btn btn-ghost" href="<?php echo addSession('grades.php'); ?>">Student Data</a>
         <a class="btn btn-ghost" href="#" <?php echo SettingsForm::attr(); ?>>Settings</a>
 <?php endif; ?>
