@@ -5,7 +5,7 @@ require_once "../config.php";
 use \Tsugi\Grades\UI;
 
 $menu = new \Tsugi\UI\MenuSet();
-$menu->addLeft(__('Back'), 'instructor.php');
+$menu->addLeft(__('Back'), 'index.php');
 
 $GRADE_DETAIL_CLASS = new \Tsugi\Grades\SimpleGradeDetail();
 

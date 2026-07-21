@@ -16,6 +16,7 @@ function dbgrader_default_exercise() {
             . "('sugar', 32, 20191218),\n"
             . "('chocolate chips', 24, 20200304);",
         'solution_sql' => "SELECT item_name, weight_oz FROM pantry_items WHERE weight_oz > 30",
+        'starter_sql' => "SELECT item_name, weight_oz\nFROM pantry_items\n",
         'verification_sql' => array(),
         'hints' => array(
             'Start with the pantry_items table.',

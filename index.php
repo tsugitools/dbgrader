@@ -8,9 +8,15 @@ require_once "exercise.php";
 
 use \Tsugi\Core\LTIX;
 use \Tsugi\Util\U;
+use \Tsugi\UI\SettingsForm;
 
 // Initialize LTI session (allows launch); grade APIs still need a real user/link.
 $LTI = LTIX::session_start();
+
+if (SettingsForm::handleSettingsPost()) {
+    header('Location: ' . addSession('index.php' . (U::get($_GET, 'mode') === 'author' ? '?mode=author' : '')));
+    return;
+}
 
 // Budget for Tsugi shared grade / attempt APIs (same pattern as CMOS).
 $_SESSION['GSRF'] = 10;
@@ -31,47 +37,54 @@ $hasLink = isset($LINK) && $LINK && !empty($LINK->id);
 $gradeSubmitUrl = addSession($CFG->wwwroot . '/api/grade-submit.php');
 $recordAttemptUrl = addSession($CFG->wwwroot . '/api/record-attempt.php');
 $saveUrl = addSession('save.php');
+$sqliteBase = rtrim($CFG->staticroot, '/') . '/js/sqlite/sqlite-wasm-3530300/jswasm/';
 
-?><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DBGrader<?php echo isset($exercise['title']) ? ' — ' . htmlentities($exercise['title']) : ''; ?></title>
-    <link rel="stylesheet" href="css/dbgrader.css">
-</head>
-<body class="mode-<?php echo htmlentities($mode); ?>">
-    <header class="topbar">
-        <div class="topbar-left">
-            <span class="brand">DBGrader</span>
-            <span id="exerciseTitle" class="exercise-title"></span>
-        </div>
-        <div class="topbar-right">
+$OUTPUT->suppressSiteNav();
+$OUTPUT->header();
+?>
+<link rel="stylesheet" href="css/dbgrader.css">
+<?php
+$OUTPUT->bodyStart();
+$OUTPUT->flashMessages();
+
+if ($isInstructor) {
+    SettingsForm::start();
+    SettingsForm::dueDate();
+    SettingsForm::end(/* ajax */ true);
+}
+?>
+<header class="topbar">
+    <div class="topbar-left">
+        <span class="brand">DBGrader</span>
+        <span id="exerciseTitle" class="exercise-title"></span>
+    </div>
+    <div class="topbar-right">
 <?php if ($isInstructor) : ?>
-            <a class="btn btn-ghost" href="<?php echo addSession('index.php?mode=author'); ?>">Author</a>
-            <a class="btn btn-ghost" href="<?php echo addSession('index.php'); ?>">Learner</a>
-            <a class="btn btn-ghost" href="<?php echo addSession('instructor.php'); ?>">Instructor</a>
+        <a class="btn btn-ghost" href="<?php echo addSession('index.php?mode=author'); ?>">Author</a>
+        <a class="btn btn-ghost" href="<?php echo addSession('index.php'); ?>">Learner</a>
+        <a class="btn btn-ghost" href="<?php echo addSession('grades.php'); ?>">Student Data</a>
+        <a class="btn btn-ghost" href="#" <?php echo SettingsForm::attr(); ?>>Settings</a>
 <?php endif; ?>
-        </div>
-    </header>
+    </div>
+</header>
 
-    <main id="app"></main>
+<main id="app"></main>
 
-    <script>
-    window.DBGRADER = {
-        mode: <?php echo json_encode($mode); ?>,
-        isInstructor: <?php echo $isInstructor ? 'true' : 'false'; ?>,
-        hasLink: <?php echo $hasLink ? 'true' : 'false'; ?>,
-        exercise: <?php echo json_encode($exercise, JSON_UNESCAPED_UNICODE); ?>,
-        urls: {
-            save: <?php echo json_encode($saveUrl); ?>,
-            gradeSubmit: <?php echo json_encode($gradeSubmitUrl); ?>,
-            recordAttempt: <?php echo json_encode($recordAttemptUrl); ?>,
-            sqliteBase: 'https://static.tsugi.org/js/sqlite/sqlite-wasm-3530300/jswasm/'
-        }
-    };
-    </script>
-    <script src="js/dbgrader-compare.js"></script>
-    <script src="js/dbgrader.js"></script>
-</body>
-</html>
+<script>
+window.DBGRADER = {
+    mode: <?php echo json_encode($mode); ?>,
+    isInstructor: <?php echo $isInstructor ? 'true' : 'false'; ?>,
+    hasLink: <?php echo $hasLink ? 'true' : 'false'; ?>,
+    exercise: <?php echo json_encode($exercise, JSON_UNESCAPED_UNICODE); ?>,
+    urls: {
+        save: <?php echo json_encode($saveUrl); ?>,
+        gradeSubmit: <?php echo json_encode($gradeSubmitUrl); ?>,
+        recordAttempt: <?php echo json_encode($recordAttemptUrl); ?>,
+        sqliteBase: <?php echo json_encode($sqliteBase); ?>
+    }
+};
+</script>
+<script src="js/dbgrader-compare.js"></script>
+<script src="js/dbgrader.js"></script>
+<?php
+$OUTPUT->footer();

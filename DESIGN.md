@@ -254,6 +254,7 @@ Initial format:
   "prompt": "Write a query that returns...",
   "setup_sql": "CREATE TABLE ...; INSERT INTO ...;",
   "solution_sql": "SELECT ...;",
+  "starter_sql": "SELECT ",
   "verification_sql": [],
   "hints": [
     "Start with the pantry_items table.",
@@ -289,6 +290,7 @@ Initial format:
 ### Optional Fields
 
 - `title`
+- `starter_sql`
 - `verification_sql`
 - `hints`
 - `comparison`
@@ -802,7 +804,6 @@ PHP stays thin (CMOS / ca4e pattern). Almost all behavior is JavaScript.
 ```text
 mod/dbgrader/
 ├── index.php              # LTI session + HTML shell + inject window.DBGRADER
-├── instructor.php         # Settings / links (due date, grades, author)
 ├── save.php               # Instructor: POST exercise JSON → lti_link.json
 ├── exercise.php           # Default sample + load helper
 ├── grades.php

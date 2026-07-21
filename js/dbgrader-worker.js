@@ -1,18 +1,22 @@
 /**
  * DBGrader Web Worker — loads SQLite WASM and runs setup / query / grade jobs.
- * SQLite from: https://static.tsugi.org/js/sqlite/sqlite-wasm-3530300/
+ * sqliteBase is supplied by the main thread from $CFG->staticroot.
  */
 'use strict';
 
 importScripts('dbgrader-compare.js');
 
-var SQLITE_BASE = 'https://static.tsugi.org/js/sqlite/sqlite-wasm-3530300/jswasm/';
+var SQLITE_BASE = null;
 var sqlite3Promise = null;
 
-function loadSqlite3() {
+function loadSqlite3(sqliteBase) {
     if (sqlite3Promise) return sqlite3Promise;
+    if (!sqliteBase) {
+        return Promise.reject(new Error('sqliteBase URL was not provided'));
+    }
+    SQLITE_BASE = sqliteBase.replace(/\/?$/, '/');
     importScripts(SQLITE_BASE + 'sqlite3.js');
-    // Worker has no document.currentScript; force WASM to load from the CDN.
+    // Worker has no document.currentScript; force WASM to load from staticroot.
     sqlite3Promise = self.sqlite3InitModule({
         locateFile: function (path) {
             return SQLITE_BASE + path;
@@ -173,7 +177,7 @@ self.onmessage = function (ev) {
     var id = msg.id;
     var action = msg.action;
 
-    loadSqlite3()
+    loadSqlite3(msg.sqliteBase)
         .then(function (sqlite3) {
             var exercise = msg.exercise || {};
             var sql = msg.submission_sql || '';

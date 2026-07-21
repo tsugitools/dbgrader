@@ -34,7 +34,11 @@
         var id = nextId++;
         return new Promise(function (resolve, reject) {
             pending[id] = { resolve: resolve, reject: reject };
-            worker.postMessage(Object.assign({ id: id, action: action }, payload || {}));
+            worker.postMessage(Object.assign({
+                id: id,
+                action: action,
+                sqliteBase: (cfg.urls && cfg.urls.sqliteBase) || null
+            }, payload || {}));
         });
     }
 
@@ -103,6 +107,9 @@
             '<section class="author-meta">' +
             '<label>Title <input id="exTitle" type="text" value="' + escapeHtml(exercise.title || '') + '"></label>' +
             '<label>Prompt <textarea id="exPrompt" rows="3">' + escapeHtml(exercise.prompt || '') + '</textarea></label>' +
+            '<label>Starter SQL for learners <span class="hint">(shown in their editor; leave blank for empty)</span>' +
+            '<textarea id="exStarter" class="code" rows="4" spellcheck="false">' +
+            escapeHtml(exercise.starter_sql || '') + '</textarea></label>' +
             '</section>' +
             '<section class="split">' +
             '<div class="pane">' +
@@ -123,11 +130,59 @@
             '</section>' +
             '<footer class="actions">' +
             '<button type="button" id="btnSave" class="btn btn-primary">Save</button>' +
+            '<button type="button" id="btnViewJson" class="btn btn-ghost">View Assignment JSON</button>' +
             '<span id="saveMsg" class="muted"></span>' +
-            '</footer>';
+            '</footer>' +
+            '<div id="jsonModal" class="dbg-modal" hidden>' +
+            '<div class="dbg-modal-backdrop" data-close-json></div>' +
+            '<div class="dbg-modal-panel" role="dialog" aria-modal="true" aria-labelledby="jsonModalTitle">' +
+            '<div class="dbg-modal-header">' +
+            '<h2 id="jsonModalTitle">Assignment JSON</h2>' +
+            '<button type="button" class="btn btn-ghost" data-close-json aria-label="Close">Close</button>' +
+            '</div>' +
+            '<pre id="jsonModalBody" class="dbg-json-body"></pre>' +
+            '<div class="dbg-modal-footer">' +
+            '<button type="button" id="btnCopyJson" class="btn btn-secondary">Copy</button>' +
+            '<button type="button" class="btn btn-ghost" data-close-json>Close</button>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
 
         document.getElementById('btnRun').addEventListener('click', authorRun);
         document.getElementById('btnSave').addEventListener('click', authorSave);
+        document.getElementById('btnViewJson').addEventListener('click', openJsonModal);
+        document.getElementById('btnCopyJson').addEventListener('click', copyJsonModal);
+        var jsonModal = document.getElementById('jsonModal');
+        jsonModal.querySelector('.dbg-modal-panel').addEventListener('click', function (ev) {
+            ev.stopPropagation();
+        });
+        jsonModal.querySelectorAll('[data-close-json]').forEach(function (el) {
+            el.addEventListener('click', closeJsonModal);
+        });
+    }
+
+    function openJsonModal() {
+        var modal = document.getElementById('jsonModal');
+        var body = document.getElementById('jsonModalBody');
+        body.textContent = JSON.stringify(collectExerciseFromForm(), null, 2);
+        modal.hidden = false;
+    }
+
+    function closeJsonModal() {
+        var modal = document.getElementById('jsonModal');
+        if (modal) modal.hidden = true;
+    }
+
+    function copyJsonModal() {
+        var text = document.getElementById('jsonModalBody').textContent;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                document.getElementById('btnCopyJson').textContent = 'Copied';
+                setTimeout(function () {
+                    document.getElementById('btnCopyJson').textContent = 'Copy';
+                }, 1200);
+            });
+        }
     }
 
     function collectExerciseFromForm() {
@@ -139,6 +194,7 @@
             prompt: document.getElementById('exPrompt').value,
             setup_sql: document.getElementById('exSetup').value,
             solution_sql: document.getElementById('exSolution').value,
+            starter_sql: document.getElementById('exStarter').value,
             verification_sql: exercise.verification_sql || [],
             hints: exercise.hints || [],
             comparison: exercise.comparison || {
@@ -210,7 +266,8 @@
             '</section>' +
             '<section class="editor-block">' +
             '<h2>Your SQL</h2>' +
-            '<textarea id="learnerSql" class="code" spellcheck="false" placeholder="SELECT …"></textarea>' +
+            '<textarea id="learnerSql" class="code" spellcheck="false" placeholder="SELECT …">' +
+            escapeHtml(exercise.starter_sql || '') + '</textarea>' +
             '<div class="btn-row">' +
             '<button type="button" id="btnRun" class="btn btn-secondary">Run</button>' +
             '<button type="button" id="btnCheck" class="btn btn-primary">Check Answer</button>' +
@@ -225,7 +282,7 @@
         document.getElementById('btnRun').addEventListener('click', learnerRun);
         document.getElementById('btnCheck').addEventListener('click', learnerCheck);
         document.getElementById('btnReset').addEventListener('click', function () {
-            document.getElementById('learnerSql').value = '';
+            document.getElementById('learnerSql').value = exercise.starter_sql || '';
             document.getElementById('runPanel').innerHTML = '';
             document.getElementById('runStatus').textContent = '';
             document.getElementById('runStatus').className = 'status';

@@ -1,18 +1,19 @@
-/* DBGrader — Udemy-inspired authoring / learner layout */
+/* DBGrader — light educational UI */
 
 :root {
-    --bg: #1c1d1f;
-    --panel: #2a2b2f;
-    --panel-2: #3e3f43;
-    --text: #f3f3f4;
-    --muted: #a1a1a8;
-    --accent: #a435f0;
-    --accent-2: #5624d0;
-    --ok: #19a865;
-    --fail: #f4522d;
-    --border: #47494f;
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --panel-2: #e9eef3;
+    --text: #1f2933;
+    --muted: #62748a;
+    --accent: #0b6bcb;
+    --accent-2: #0a58a0;
+    --ok: #1a7f4b;
+    --fail: #c62828;
+    --border: #d0d7de;
+    --code-bg: #f8fafc;
     --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -31,7 +32,7 @@ body {
     align-items: center;
     gap: 1rem;
     padding: 0.75rem 1.25rem;
-    background: #111;
+    background: var(--panel);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
@@ -42,6 +43,7 @@ body {
     font-weight: 700;
     letter-spacing: 0.02em;
     margin-right: 0.75rem;
+    color: var(--accent-2);
 }
 
 .exercise-title {
@@ -81,6 +83,10 @@ body {
     font: inherit;
 }
 
+.author-meta textarea.code {
+    min-height: 6rem;
+}
+
 .split {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -117,8 +123,8 @@ textarea.code {
     flex: 1;
     width: 100%;
     min-height: 180px;
-    background: #121212;
-    color: #e8e8ea;
+    background: var(--code-bg);
+    color: var(--text);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 0.75rem;
@@ -167,7 +173,7 @@ textarea.code {
     background: var(--panel-2);
 }
 
-.btn:hover { filter: brightness(1.08); }
+.btn:hover { filter: brightness(0.97); }
 
 .btn-primary {
     background: var(--accent);
@@ -182,6 +188,7 @@ textarea.code {
 .btn-ghost {
     background: transparent;
     border-color: var(--border);
+    color: var(--text);
 }
 
 .result-section {
@@ -208,9 +215,9 @@ textarea.code {
     color: var(--muted);
 }
 
-.status-success { background: rgba(25, 168, 101, 0.2); color: var(--ok); }
-.status-fail { background: rgba(244, 82, 45, 0.2); color: var(--fail); }
-.status-error { background: rgba(244, 82, 45, 0.25); color: var(--fail); }
+.status-success { background: #e6f6ec; color: var(--ok); }
+.status-fail { background: #fdecea; color: var(--fail); }
+.status-error { background: #fdecea; color: var(--fail); }
 .status-pending { color: var(--muted); }
 
 .result-table-wrap { overflow-x: auto; }
@@ -243,10 +250,79 @@ textarea.code {
 .error-detail {
     white-space: pre-wrap;
     color: var(--fail);
-    background: #1a1010;
+    background: #fdecea;
     padding: 0.75rem;
     border-radius: 4px;
     overflow-x: auto;
 }
 
 .muted { color: var(--muted); font-size: 0.9rem; }
+
+.dbg-modal[hidden] { display: none !important; }
+
+.dbg-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.dbg-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.dbg-modal-panel {
+    position: relative;
+    z-index: 1;
+    width: min(720px, 100%);
+    max-height: min(80vh, 900px);
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+    pointer-events: auto;
+}
+
+.dbg-modal-header,
+.dbg-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.dbg-modal-footer {
+    border-bottom: none;
+    border-top: 1px solid var(--border);
+    justify-content: flex-end;
+}
+
+.dbg-modal-header h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.dbg-json-body {
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.45;
+    background: var(--code-bg);
+    color: var(--text);
+    white-space: pre;
+    user-select: text;
+    -webkit-user-select: text;
+}
