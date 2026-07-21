@@ -118,18 +118,20 @@ A learner should be able to run exploratory queries without recording every run 
 
 ### 3. SQLite WASM Runtime
 
-SQLite will be hosted on:
+SQLite will be hosted on the Tsugi static CDN using the official `sqlite-wasm-*` bundle layout:
 
 ```text
-https://static.tsugi.org/sqlite/<version>/
+https://static.tsugi.org/js/sqlite/sqlite-wasm-<NNNNNNN>/
 ```
 
-Example:
+Current pin (SQLite 3.53.3 / release `3530300`):
 
 ```text
-https://static.tsugi.org/sqlite/3.53.3/sqlite3.js
-https://static.tsugi.org/sqlite/3.53.3/sqlite3.wasm
+https://static.tsugi.org/js/sqlite/sqlite-wasm-3530300/jswasm/sqlite3.js
+https://static.tsugi.org/js/sqlite/sqlite-wasm-3530300/jswasm/sqlite3.wasm
 ```
+
+Bundle index / demos: https://static.tsugi.org/js/sqlite/sqlite-wasm-3530300/
 
 The JavaScript and WASM files must come from the same SQLite release bundle.
 
@@ -795,31 +797,31 @@ Regression coverage should include:
 
 ## Suggested File Structure
 
+PHP stays thin (CMOS / ca4e pattern). Almost all behavior is JavaScript.
+
 ```text
-tool/dbgrader/
-├── index.php
-├── configure.php
-├── save.php
-├── grade.php
+mod/dbgrader/
+├── index.php              # LTI session + HTML shell + inject window.DBGRADER
+├── instructor.php         # Settings / links (due date, grades, author)
+├── save.php               # Instructor: POST exercise JSON → lti_link.json
+├── exercise.php           # Default sample + load helper
+├── grades.php
+├── grade-detail.php
+├── register.php
+├── tsugi.php
 ├── js/
-│   ├── dbgrader.js
-│   ├── dbgrader-worker.js
+│   ├── dbgrader.js            # Author + learner UI
+│   ├── dbgrader-worker.js     # SQLite WASM worker
 │   ├── dbgrader-compare.js
-│   ├── dbgrader-meta.js
-│   ├── dbgrader-dialects.js
-│   └── dbgrader-base64.js
+│   ├── dbgrader-meta.js       # (later)
+│   ├── dbgrader-dialects.js   # (later)
+│   └── dbgrader-base64.js     # (later)
 ├── css/
 │   └── dbgrader.css
-├── templates/
-│   ├── author.php
-│   └── learner.php
-├── tests/
-│   ├── exercises/
-│   └── browser/
 └── DESIGN.md
 ```
 
-The exact Tsugi conventions should take precedence over this illustrative structure.
+Grading uses shared Tsugi APIs (`/api/grade-submit.php`, `/api/record-attempt.php`), not a tool-local grade endpoint.
 
 ## Initial Implementation Plan
 
