@@ -4,17 +4,34 @@
  * Pattern inspired by ca4e/tools/cmos: keep PHP minimal, build in JavaScript.
  */
 require_once "../config.php";
+require_once "assignments.php";
 require_once "exercise.php";
 
 use \Tsugi\Core\LTIX;
+use \Tsugi\Core\Settings;
 use \Tsugi\Util\U;
 use \Tsugi\UI\SettingsForm;
 
 // Initialize LTI session (allows launch); grade APIs still need a real user/link.
 $LTI = LTIX::session_start();
 
+// If the instructor picks a built-in assignment in Settings, copy it into
+// lti_link.json so Edit is populated. Save from Edit overwrites that JSON.
+$oldExerciseSetting = Settings::linkGet('exercise');
 if (SettingsForm::handleSettingsPost()) {
-    header('Location: ' . addSession('index.php' . (U::get($_GET, 'mode') === 'author' ? '?mode=author' : '')));
+    $newExerciseSetting = Settings::linkGet('exercise');
+    $assignmentChanged = $newExerciseSetting && $newExerciseSetting !== '0'
+        && (string) $newExerciseSetting !== (string) $oldExerciseSetting;
+    if ($assignmentChanged) {
+        $builtin = dbgrader_builtin_exercise($newExerciseSetting);
+        if ($builtin && isset($LINK) && $LINK && method_exists($LINK, 'setJson')) {
+            $LINK->setJson(json_encode($builtin));
+        }
+    }
+    $redirectMode = $assignmentChanged || U::get($_GET, 'mode') === 'author'
+        ? '?mode=author'
+        : '';
+    header('Location: ' . addSession('index.php' . $redirectMode));
     return;
 }
 
@@ -31,7 +48,9 @@ if ($mode === 'author' && !$isInstructor) {
     $mode = 'learner';
 }
 
-$exercise = dbgrader_load_exercise(isset($LINK) ? $LINK : null);
+$loaded = dbgrader_load_exercise(isset($LINK) ? $LINK : null);
+$exercise = $loaded['exercise'];
+$assignmentKey = $loaded['assignmentKey'];
 $hasLink = isset($LINK) && $LINK && !empty($LINK->id);
 
 $gradeSubmitUrl = addSession($CFG->wwwroot . '/api/grade-submit.php');
@@ -49,6 +68,7 @@ $OUTPUT->flashMessages();
 
 if ($isInstructor) {
     SettingsForm::start();
+    SettingsForm::select('exercise', __('Please select an assignment'), $assignments);
     SettingsForm::dueDate();
     SettingsForm::end(/* ajax */ true);
 }
@@ -79,6 +99,8 @@ window.DBGRADER = {
     mode: <?php echo json_encode($mode); ?>,
     isInstructor: <?php echo $isInstructor ? 'true' : 'false'; ?>,
     hasLink: <?php echo $hasLink ? 'true' : 'false'; ?>,
+    assignmentKey: <?php echo json_encode($assignmentKey); ?>,
+    assignments: <?php echo json_encode($assignments); ?>,
     exercise: <?php echo json_encode($exercise, JSON_UNESCAPED_UNICODE); ?>,
     urls: {
         save: <?php echo json_encode($saveUrl); ?>,

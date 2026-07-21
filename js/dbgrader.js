@@ -228,6 +228,18 @@
     var jsonModalTab = 'assignment';
 
     function buildLessonsCustomSnippet(ex) {
+        // Prefer built-in key (CA4E-style) when this placement uses a catalog assignment.
+        var key = cfg.assignmentKey || (ex && ex.builtin) || null;
+        if (key) {
+            return {
+                custom: [
+                    {
+                        key: 'exercise',
+                        value: key
+                    }
+                ]
+            };
+        }
         return {
             custom: [
                 {

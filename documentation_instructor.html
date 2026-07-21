@@ -46,7 +46,7 @@
                     <li><strong>Help</strong> — learner documentation</li>
                     <li><strong>Instructor Help</strong> — this page</li>
                     <li><strong>Student Data</strong> — grades table</li>
-                    <li><strong>Settings</strong> — due date and link settings</li>
+                    <li><strong>Settings</strong> — choose a built-in assignment and due date</li>
                 </ul>
             </div>
 
@@ -104,16 +104,31 @@ SELECT COUNT(*) FROM orders;</div>
   "compatibility": ["dbgrader", "udemy"]
 }</div>
 
-            <h3>Preload from lessons.json</h3>
-            <p>On first launch with empty link JSON, DBGrader seeds from LTI <code>custom_config</code>,
-               or from <code>?inherit=&lt;resource_link_id&gt;</code> in <code>$CFG-&gt;lessons</code>:</p>
+            <h3>Built-in assignments</h3>
+            <p>Catalog keys live in <code>assignments.php</code>; exercise bodies in <code>assignments/*.php</code>.
+               First built-in: <code>PantryExercise</code>.</p>
+            <p>Select under <strong>Settings</strong>, or set on first launch with LTI custom
+               (copied into the link settings row only when that setting is empty):</p>
+            <div class="code-block">"custom": [
+  {
+    "key": "exercise",
+    "value": "PantryExercise"
+  }
+]</div>
+            <p>Load order: existing <code>lti_link.json</code> wins; else full <code>custom_config</code> JSON;
+               else the built-in named by the <code>exercise</code> setting; else an empty stub.</p>
+
+            <h3>Preload full exercise from lessons.json</h3>
+            <p>Alternate shape when you are not using a built-in — seeds <code>lti_link.json</code> on first empty launch,
+               or via <code>?inherit=&lt;resource_link_id&gt;</code>:</p>
             <div class="code-block">"custom": [
   {
     "key": "config",
     "json": { /* exercise object */ }
   }
 ]</div>
-            <p><strong>Edit</strong> → <strong>View Assignment JSON</strong> → <strong>lessons.json custom</strong> tab produces this snippet.</p>
+            <p><strong>Edit</strong> → <strong>View Assignment JSON</strong> → <strong>lessons.json custom</strong> produces
+               the <code>exercise</code> key snippet when a built-in is selected, otherwise the full <code>config</code> object.</p>
         </div>
 
         <div id="grading" class="tab-content">

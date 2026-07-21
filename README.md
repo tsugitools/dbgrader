@@ -36,12 +36,25 @@ As instructor, open **Edit** (or `index.php?mode=author`):
 2. Write **setup.sql** (left as Evaluation) and **solution.sql**
 3. Optionally set **Starter SQL** for the learner editor
 4. **Run query** to preview expected results
-5. **Save** to the placement JSON
-6. **View Assignment JSON** — copy the exercise object, or the `lessons.json` `custom` snippet (`key: config`)
+6. **Save** to the placement JSON
+7. **View Assignment JSON** — copy the exercise object, or the `lessons.json` `custom` snippet (`exercise` key for built-ins, or full `config` JSON)
 
 ### Preload from lessons.json
 
-On first launch with an empty link JSON, DBGrader seeds from LTI `custom_config` (same pattern as peer-grade CSS):
+**Preferred (built-in catalog):** on first launch, LTI custom `exercise` is copied into the link settings row when that setting is empty (same as CA4E):
+
+```json
+"custom": [
+  {
+    "key": "exercise",
+    "value": "PantryExercise"
+  }
+]
+```
+
+Instructors can also pick the assignment under **Settings**. Built-ins live in `assignments/` (catalog in `assignments.php`).
+
+**Alternate (inline exercise):** full JSON via `custom_config` still works when link JSON is empty:
 
 ```json
 "custom": [
@@ -52,7 +65,7 @@ On first launch with an empty link JSON, DBGrader seeds from LTI `custom_config`
 ]
 ```
 
-If the LMS dropped customs, `?inherit=<resource_link_id>` reloads that block from `$CFG->lessons`.
+If the LMS dropped customs, `?inherit=<resource_link_id>` reloads the `config` block from `$CFG->lessons`.
 
 ## Learner
 

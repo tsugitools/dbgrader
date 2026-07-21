@@ -1,47 +1,43 @@
 <?php
 /**
- * Exercise defaults and first-launch load from LTI custom / lessons.json.
+ * Exercise defaults, built-in catalog resolution, and first-launch preload.
  *
- * lessons.json pattern (same shape as peer-grade CSS "config"):
+ * Priority when loading a placement:
+ *   1. Valid exercise already in lti_link.json (instructor Edit / Save, or seeded config)
+ *   2. Full exercise in LTI custom_config / ?inherit= (legacy lessons.json shape)
+ *   3. Built-in from Settings / LTI custom "exercise" (CA4E-style)
+ *   4. Empty stub (instructor must pick Settings → Exercise or author one)
  *
- *   "custom": [
- *     {
- *       "key": "config",
- *       "json": { ... exercise object ... }
- *     }
- *   ]
+ * Built-in selection (same as cdc6504):
  *
- * On first launch with an empty lti_link.json, that custom (or ?inherit=)
- * is copied into the link JSON once.
+ *   "custom": [ { "key": "exercise", "value": "PantryExercise" } ]
+ *
+ * On first launch, Settings::linkGetCustom('exercise') copies that into the
+ * link settings row only when the setting is not already present.
  */
 
+require_once __DIR__ . '/assignments.php';
+
 use \Tsugi\Core\LTIX;
+use \Tsugi\Core\Settings;
 use \Tsugi\Util\U;
 use \Tsugi\UI\Lessons;
 
 /**
- * Default pantry exercise when a placement has no JSON yet.
+ * Empty exercise when nothing is configured yet.
  */
-function dbgrader_default_exercise() {
+function dbgrader_empty_exercise() {
     return array(
         'version' => 1,
         'type' => 'sqlite',
         'mode' => 'query',
-        'title' => 'Pantry Items Over 30 Ounces',
-        'prompt' => 'Write a query that returns the item_name and weight_oz for all pantry items weighing more than 30 ounces.',
-        'setup_sql' => "CREATE TABLE pantry_items (item_name TEXT, weight_oz REAL, date_purchased INTEGER);\n"
-            . "INSERT INTO pantry_items VALUES\n"
-            . "('flour', 64, 20190506),\n"
-            . "('sugar', 32, 20191218),\n"
-            . "('chocolate chips', 24, 20200304);",
-        'solution_sql' => "SELECT item_name, weight_oz FROM pantry_items WHERE weight_oz > 30",
-        'starter_sql' => "SELECT item_name, weight_oz\nFROM pantry_items\n",
+        'title' => '',
+        'prompt' => 'No assignment configured yet. Instructors: open Settings and choose an assignment, or use Edit to author one.',
+        'setup_sql' => '',
+        'solution_sql' => '',
+        'starter_sql' => '',
         'verification_sql' => array(),
-        'hints' => array(
-            'Start with the pantry_items table.',
-            'Use a WHERE clause.',
-            'Compare weight_oz with 30.',
-        ),
+        'hints' => array(),
         'comparison' => array(
             'column_names' => true,
             'column_order' => true,
@@ -49,7 +45,7 @@ function dbgrader_default_exercise() {
             'numeric_tolerance' => 0,
         ),
         'dialect' => 'sqlite',
-        'compatibility' => array('dbgrader', 'udemy'),
+        'compatibility' => array('dbgrader'),
     );
 }
 
@@ -76,7 +72,37 @@ function dbgrader_decode_exercise_json($raw) {
 }
 
 /**
- * Pull exercise JSON from LTI custom_config, then lessons.json via ?inherit=.
+ * Resolve built-in assignment key from link settings / LTI custom / ?exercise=.
+ *
+ * @return string|null
+ */
+function dbgrader_resolve_exercise_key() {
+    global $assignments, $LINK;
+
+    $assn = null;
+    if ($LINK) {
+        $assn = Settings::linkGetCustom('exercise');
+        // SettingsForm::select uses "0" for "Please select".
+        if ($assn === '0' || $assn === 0 || $assn === false || $assn === '') {
+            $assn = null;
+        }
+    }
+
+    if (!$LINK && isset($_GET['exercise'])) {
+        $g = $_GET['exercise'];
+        if (is_string($g) && isset($assignments[$g])) {
+            $assn = $g;
+        }
+    }
+
+    if ($assn && isset($assignments[$assn])) {
+        return $assn;
+    }
+    return null;
+}
+
+/**
+ * Pull full exercise JSON from LTI custom_config, then lessons.json via ?inherit=.
  */
 function dbgrader_load_custom_exercise() {
     global $CFG;
@@ -94,7 +120,6 @@ function dbgrader_load_custom_exercise() {
             if (isset($lti->custom) && is_array($lti->custom)) {
                 foreach ($lti->custom as $c) {
                     if (isset($c->key, $c->json) && $c->key === 'config') {
-                        // json may already be an object/array from lessons decode
                         if (is_string($c->json)) {
                             $exercise = dbgrader_decode_exercise_json($c->json);
                         } else {
@@ -116,16 +141,23 @@ function dbgrader_load_custom_exercise() {
 }
 
 /**
- * Load exercise from link JSON; on first empty launch seed from custom/lessons.
+ * Load exercise from link JSON; else custom config; else built-in; else empty.
+ *
+ * @return array{exercise: array, assignmentKey: ?string}
  */
 function dbgrader_load_exercise($LINK) {
+    $assignmentKey = dbgrader_resolve_exercise_key();
+
     $raw = null;
     if ($LINK && method_exists($LINK, 'getJson')) {
         $raw = $LINK->getJson();
     }
     $existing = dbgrader_decode_exercise_json($raw);
     if ($existing) {
-        return $existing;
+        return array(
+            'exercise' => $existing,
+            'assignmentKey' => $assignmentKey,
+        );
     }
 
     $fromCustom = dbgrader_load_custom_exercise();
@@ -133,8 +165,28 @@ function dbgrader_load_exercise($LINK) {
         if ($LINK && method_exists($LINK, 'setJson') && !empty($LINK->id)) {
             $LINK->setJson(json_encode($fromCustom));
         }
-        return $fromCustom;
+        return array(
+            'exercise' => $fromCustom,
+            'assignmentKey' => $assignmentKey,
+        );
     }
 
-    return dbgrader_default_exercise();
+    if ($assignmentKey) {
+        $builtin = dbgrader_builtin_exercise($assignmentKey);
+        if ($builtin) {
+            // Seed link JSON so Edit / Save have a real placement copy.
+            if ($LINK && method_exists($LINK, 'setJson') && !empty($LINK->id)) {
+                $LINK->setJson(json_encode($builtin));
+            }
+            return array(
+                'exercise' => $builtin,
+                'assignmentKey' => $assignmentKey,
+            );
+        }
+    }
+
+    return array(
+        'exercise' => dbgrader_empty_exercise(),
+        'assignmentKey' => $assignmentKey,
+    );
 }
