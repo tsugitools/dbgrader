@@ -589,6 +589,21 @@ textarea.code {
     font-size: 1.05rem;
 }
 
+.dbg-modal-code,
+.dbg-json-body {
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    flex: 1 1 auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--panel-2);
+    color: var(--text);
+}
+
 .prompt-block .instructions-link,
 .dbg-collapse-body .instructions-link {
     margin: 0.5rem 0 0;

@@ -377,6 +377,67 @@
         if (modal) modal.hidden = true;
     }
 
+    function solutionModalHtml() {
+        return '<div id="solutionModal" class="dbg-modal" hidden>' +
+            '<div class="dbg-modal-backdrop" data-close-solution></div>' +
+            '<div class="dbg-modal-panel" role="dialog" aria-modal="true" aria-labelledby="solutionModalTitle">' +
+            '<div class="dbg-modal-header">' +
+            '<h2 id="solutionModalTitle">Solution SQL</h2>' +
+            '<button type="button" class="btn btn-ghost" data-close-solution aria-label="Close">Close</button>' +
+            '</div>' +
+            '<pre id="solutionModalBody" class="dbg-modal-code"></pre>' +
+            '<div class="dbg-modal-footer">' +
+            '<button type="button" id="btnCopySolution" class="btn btn-secondary">Copy</button>' +
+            '<button type="button" class="btn btn-ghost" data-close-solution>Close</button>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+    }
+
+    function solutionModalText() {
+        var sql = (exercise && exercise.solution_sql) ? String(exercise.solution_sql) : '';
+        return sql.trim() ? sql : '(No solution SQL configured.)';
+    }
+
+    function openSolutionModal() {
+        var modal = document.getElementById('solutionModal');
+        var body = document.getElementById('solutionModalBody');
+        if (body) body.textContent = solutionModalText();
+        if (modal) modal.hidden = false;
+    }
+
+    function closeSolutionModal() {
+        var modal = document.getElementById('solutionModal');
+        if (modal) modal.hidden = true;
+    }
+
+    function bindSolutionModal() {
+        var btn = document.getElementById('btnShowSolution');
+        if (btn) btn.addEventListener('click', openSolutionModal);
+        var modal = document.getElementById('solutionModal');
+        if (!modal) return;
+        modal.querySelector('.dbg-modal-panel').addEventListener('click', function (ev) {
+            ev.stopPropagation();
+        });
+        modal.querySelectorAll('[data-close-solution]').forEach(function (el) {
+            el.addEventListener('click', closeSolutionModal);
+        });
+        var copyBtn = document.getElementById('btnCopySolution');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+                var text = solutionModalText();
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        copyBtn.textContent = 'Copied';
+                        setTimeout(function () {
+                            copyBtn.textContent = 'Copy';
+                        }, 1200);
+                    });
+                }
+            });
+        }
+    }
+
     function copyJsonModal() {
         var text = jsonModalText();
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -553,6 +614,9 @@
             renderLearnerPlayground();
             return;
         }
+        var showSolutionBtn = cfg.isInstructor
+            ? '<button type="button" id="btnShowSolution" class="btn btn-ghost">Show solution</button>'
+            : '';
         app.innerHTML =
             '<section class="prompt-block">' +
             '<h1>' + escapeHtml(exercise.title || 'SQL exercise') + '</h1>' +
@@ -567,12 +631,14 @@
             '<button type="button" id="btnRun" class="btn btn-secondary">Run</button>' +
             '<button type="button" id="btnCheck" class="btn btn-primary">Check Answer</button>' +
             '<button type="button" id="btnReset" class="btn btn-ghost">Reset</button>' +
+            showSolutionBtn +
             '</div>' +
             '</section>' +
             '<section class="result-section">' +
             '<div class="result-header"><h2>Result</h2><span id="runStatus" class="status"></span></div>' +
             '<div id="runPanel"></div>' +
-            '</section>';
+            '</section>' +
+            (cfg.isInstructor ? solutionModalHtml() : '');
 
         document.getElementById('btnRun').addEventListener('click', learnerRun);
         bindSqlRunShortcut(learnerRun);
@@ -583,6 +649,9 @@
             document.getElementById('runStatus').textContent = '';
             document.getElementById('runStatus').className = 'status';
         });
+        if (cfg.isInstructor) {
+            bindSolutionModal();
+        }
     }
 
     function renderLearnerUpload() {
