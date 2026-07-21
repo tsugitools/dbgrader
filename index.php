@@ -57,6 +57,8 @@ $gradeSubmitUrl = addSession($CFG->wwwroot . '/api/grade-submit.php');
 $recordAttemptUrl = addSession($CFG->wwwroot . '/api/record-attempt.php');
 $saveUrl = addSession('save.php');
 $sqliteBase = rtrim($CFG->staticroot, '/') . '/js/sqlite/sqlite-wasm-3530300/jswasm/';
+$assetBust = dbgrader_asset_bust();
+$workerUrl = 'js/dbgrader-worker.js?v=' . $assetBust;
 
 $OUTPUT->suppressSiteNav();
 $OUTPUT->header();
@@ -70,7 +72,8 @@ if ($isInstructor) {
     SettingsForm::start();
     SettingsForm::select('exercise', __('Please select an assignment'), $assignments);
     SettingsForm::dueDate();
-    SettingsForm::end(/* ajax */ true);
+    // Non-AJAX so index.php can copy the built-in into lti_link.json on change.
+    SettingsForm::end(/* ajax */ false);
 }
 ?>
 <header class="topbar">
@@ -106,7 +109,8 @@ window.DBGRADER = {
         save: <?php echo json_encode($saveUrl); ?>,
         gradeSubmit: <?php echo json_encode($gradeSubmitUrl); ?>,
         recordAttempt: <?php echo json_encode($recordAttemptUrl); ?>,
-        sqliteBase: <?php echo json_encode($sqliteBase); ?>
+        sqliteBase: <?php echo json_encode($sqliteBase); ?>,
+        worker: <?php echo json_encode($workerUrl); ?>
     }
 };
 </script>

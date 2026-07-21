@@ -79,6 +79,17 @@ SELECT COUNT(*) FROM orders;</div>
             </div>
             <p>Prefer PRAGMA / catalog checks over comparing raw <code>CREATE TABLE</code> strings so formatting differences do not fail students.</p>
             <p>Database-state exercises are DBGrader-only (<code>compatibility: ["dbgrader"]</code>).</p>
+
+            <h3>upload-check</h3>
+            <p>Learner uploads a SQLite database file (<code>.sqlite3</code> / <code>.sqlite</code> / <code>.db</code>, max 3M).
+               The browser opens it with SQLite WASM (no server upload of the DB contents for grading).</p>
+            <ul>
+                <li>Author builds an <strong>expected reference DB</strong> with setup (and optional solution) SQL</li>
+                <li>The same <code>verification_sql</code> runs on the gold DB and on the uploaded file</li>
+                <li>Results are compared (prefer <code>COUNT(*)</code> / filtered checks over volatile <code>id</code> dumps)</li>
+                <li>Built-in example: <code>PollsExercise</code> (Polls batch load)</li>
+            </ul>
+            <p>Upload-check exercises are DBGrader-only (<code>compatibility: ["dbgrader"]</code>).</p>
         </div>
 
         <div id="json" class="tab-content">
@@ -90,6 +101,7 @@ SELECT COUNT(*) FROM orders;</div>
   "mode": "query",
   "title": "...",
   "prompt": "...",
+  "instructions_url": "https://www.dj4e.com/assn/dj4e_batch.md",
   "setup_sql": "...",
   "solution_sql": "...",
   "starter_sql": "...",
@@ -103,10 +115,13 @@ SELECT COUNT(*) FROM orders;</div>
   "dialect": "sqlite",
   "compatibility": ["dbgrader", "udemy"]
 }</div>
+            <p><code>instructions_url</code> is optional. When set to an <code>http(s)</code> URL, learners see an
+               <strong>Assignment instructions</strong> link under the prompt.</p>
 
             <h3>Built-in assignments</h3>
             <p>Catalog keys live in <code>assignments.php</code>; exercise bodies in <code>assignments/*.php</code>.
-               First built-in: <code>PantryExercise</code>.</p>
+               Built-ins include <code>PantryExercise</code>, <code>SimpleWhereExercise</code>, and
+               <code>PollsExercise</code> (upload-check).</p>
             <p>Select under <strong>Settings</strong>, or set on first launch with LTI custom
                (copied into the link settings row only when that setting is empty):</p>
             <div class="code-block">"custom": [

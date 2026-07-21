@@ -144,7 +144,21 @@ body {
     font-weight: 600;
 }
 
-.result-label:first-child { margin-top: 0; }
+.result-heading:first-child .result-label { margin-top: 0; }
+
+.result-sql {
+    margin: 0 0 0.5rem;
+    padding: 0.45rem 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+}
 
 .split {
     display: grid;
@@ -418,17 +432,36 @@ textarea.code {
     border-bottom-color: var(--accent);
 }
 
-.dbg-json-body {
-    margin: 0;
-    padding: 1rem;
-    overflow: auto;
-    flex: 1;
-    font-family: var(--mono);
-    font-size: 0.82rem;
-    line-height: 1.45;
-    background: var(--code-bg);
-    color: var(--text);
-    white-space: pre;
-    user-select: text;
-    -webkit-user-select: text;
+.prompt-block .instructions-link {
+    margin: 0.5rem 0 0;
 }
+
+.prompt-block .instructions-link a {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.prompt-block .instructions-link a:hover {
+    text-decoration: underline;
+    color: var(--accent-2);
+}
+
+
+.upload-block h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+}
+
+.upload-label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0.75rem 0 1rem;
+}
+
+.upload-label input[type="file"] {
+    color: var(--text);
+}
+

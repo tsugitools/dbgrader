@@ -33,29 +33,59 @@ if (!is_array($exercise)) {
     return;
 }
 
-if (!isset($exercise['solution_sql'], $exercise['prompt'])) {
+if (!isset($exercise['prompt']) || !strlen(trim($exercise['prompt']))) {
     http_response_code(400);
-    echo json_encode(array('status' => 'failure', 'detail' => 'Missing required fields: prompt, solution_sql'));
+    echo json_encode(array('status' => 'failure', 'detail' => 'Missing required field: prompt'));
     return;
 }
 
 if (!isset($exercise['setup_sql'])) {
     $exercise['setup_sql'] = '';
 }
+if (!isset($exercise['solution_sql'])) {
+    $exercise['solution_sql'] = '';
+}
 
 $mode = isset($exercise['mode']) ? $exercise['mode'] : 'query';
-if ($mode === 'database-state') {
-    $verify = isset($exercise['verification_sql']) ? $exercise['verification_sql'] : null;
-    $hasVerify = is_array($verify) ? count($verify) > 0 : (is_string($verify) && strlen(trim($verify)) > 0);
+$verify = isset($exercise['verification_sql']) ? $exercise['verification_sql'] : null;
+$hasVerify = is_array($verify) ? count($verify) > 0 : (is_string($verify) && strlen(trim($verify)) > 0);
+
+if ($mode === 'upload-check') {
+    if (!$hasVerify) {
+        http_response_code(400);
+        echo json_encode(array('status' => 'failure', 'detail' => 'upload-check mode requires verification_sql'));
+        return;
+    }
+    if (!strlen(trim($exercise['setup_sql'])) && !strlen(trim($exercise['solution_sql']))) {
+        http_response_code(400);
+        echo json_encode(array(
+            'status' => 'failure',
+            'detail' => 'upload-check mode requires setup_sql and/or solution_sql for the expected reference database'
+        ));
+        return;
+    }
+} else if ($mode === 'database-state') {
     if (!$hasVerify) {
         http_response_code(400);
         echo json_encode(array('status' => 'failure', 'detail' => 'database-state mode requires verification_sql'));
         return;
     }
-} else if (!strlen(trim($exercise['setup_sql']))) {
-    http_response_code(400);
-    echo json_encode(array('status' => 'failure', 'detail' => 'query mode requires setup_sql'));
-    return;
+    if (!strlen(trim($exercise['solution_sql']))) {
+        http_response_code(400);
+        echo json_encode(array('status' => 'failure', 'detail' => 'database-state mode requires solution_sql'));
+        return;
+    }
+} else {
+    if (!strlen(trim($exercise['solution_sql']))) {
+        http_response_code(400);
+        echo json_encode(array('status' => 'failure', 'detail' => 'query mode requires solution_sql'));
+        return;
+    }
+    if (!strlen(trim($exercise['setup_sql']))) {
+        http_response_code(400);
+        echo json_encode(array('status' => 'failure', 'detail' => 'query mode requires setup_sql'));
+        return;
+    }
 }
 
 // Normalize required defaults

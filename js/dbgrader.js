@@ -14,7 +14,7 @@
 
     function ensureWorker() {
         if (worker) return worker;
-        worker = new Worker('js/dbgrader-worker.js');
+        worker = new Worker((cfg.urls && cfg.urls.worker) || 'js/dbgrader-worker.js');
         worker.onmessage = function (ev) {
             var msg = ev.data || {};
             var waiter = pending[msg.id];
@@ -34,12 +34,58 @@
         var id = nextId++;
         return new Promise(function (resolve, reject) {
             pending[id] = { resolve: resolve, reject: reject };
-            worker.postMessage(Object.assign({
+            var msg = Object.assign({
                 id: id,
                 action: action,
                 sqliteBase: (cfg.urls && cfg.urls.sqliteBase) || null
-            }, payload || {}));
+            }, payload || {});
+            var transfer = [];
+            if (msg.db_bytes && msg.db_bytes instanceof ArrayBuffer) {
+                transfer.push(msg.db_bytes);
+            } else if (msg.db_bytes && msg.db_bytes.buffer instanceof ArrayBuffer
+                && msg.db_bytes.byteOffset === 0
+                && msg.db_bytes.byteLength === msg.db_bytes.buffer.byteLength) {
+                transfer.push(msg.db_bytes.buffer);
+            }
+            if (transfer.length) {
+                worker.postMessage(msg, transfer);
+            } else {
+                worker.postMessage(msg);
+            }
         });
+    }
+
+    function normalizeMode(m) {
+        if (m === 'database-state' || m === 'upload-check') return m;
+        return 'query';
+    }
+
+    var MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+
+    function looksLikeSqliteName(name) {
+        return /\.(sqlite3|sqlite|db)$/i.test(name || '');
+    }
+
+    function readFileAsArrayBuffer(file) {
+        return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function () { resolve(reader.result); };
+            reader.onerror = function () { reject(new Error('Could not read file')); };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    function validateUploadFile(file) {
+        if (!file) {
+            return 'Choose a SQLite database file first.';
+        }
+        if (file.size > MAX_UPLOAD_BYTES) {
+            return 'Uploaded file must be < 3M.';
+        }
+        if (!looksLikeSqliteName(file.name)) {
+            return 'Uploaded file must have a .sqlite3, .sqlite, or .db suffix.';
+        }
+        return null;
     }
 
     function escapeHtml(s) {
@@ -58,8 +104,15 @@
             return '<p class="muted">Query succeeded with an empty result.</p>';
         }
         var html = '';
-        if (result.label) {
-            html += '<h3 class="result-label">' + escapeHtml(result.label) + '</h3>';
+        if (result.label || result.sql) {
+            html += '<div class="result-heading">';
+            if (result.label) {
+                html += '<h3 class="result-label">' + escapeHtml(result.label) + '</h3>';
+            }
+            if (result.sql) {
+                html += '<pre class="result-sql">' + escapeHtml(result.sql) + '</pre>';
+            }
+            html += '</div>';
         }
         html += '<div class="result-table-wrap"><table class="result-table"><thead><tr>';
         result.columns.forEach(function (c) {
@@ -132,48 +185,80 @@
     function syncAuthorModeUi() {
         var modeEl = document.getElementById('exMode');
         var verifyBlock = document.getElementById('verifyBlock');
+        var starterBlock = document.getElementById('starterBlock');
+        var solutionHint = document.getElementById('solutionHint');
+        var setupHint = document.getElementById('setupHint');
         if (!modeEl || !verifyBlock) return;
-        var isState = modeEl.value === 'database-state';
-        verifyBlock.hidden = !isState;
+        var mode = normalizeMode(modeEl.value);
+        var needsVerify = mode === 'database-state' || mode === 'upload-check';
+        verifyBlock.hidden = !needsVerify;
+        if (starterBlock) {
+            starterBlock.hidden = mode === 'upload-check';
+        }
+        if (solutionHint) {
+            solutionHint.textContent = mode === 'upload-check'
+                ? 'optional SQL after setup to build expected reference DB'
+                : 'learner goal SQL';
+        }
+        if (setupHint) {
+            if (mode === 'upload-check') {
+                setupHint.textContent = 'expected reference DB (CREATE/INSERT)';
+            } else if (mode === 'database-state') {
+                setupHint.textContent = 'setup.sql (optional in database-state)';
+            } else {
+                setupHint.textContent = 'setup.sql';
+            }
+        }
+        var verifyHint = document.getElementById('verifyHint');
+        if (verifyHint) {
+            verifyHint.textContent = mode === 'upload-check'
+                ? 'run on gold DB and on the uploaded file; results must match'
+                : 'one or more queries, separated by semicolons — used in database-state mode';
+        }
         var runBtn = document.getElementById('btnRun');
         if (runBtn) {
-            runBtn.textContent = isState ? 'Run verification preview' : 'Run query';
+            runBtn.textContent = needsVerify ? 'Run verification preview' : 'Run query';
         }
     }
 
     // ---- Author view ----
     function renderAuthor() {
         document.getElementById('exerciseTitle').textContent = exercise.title || 'Edit exercise';
-        var mode = exercise.mode === 'database-state' ? 'database-state' : 'query';
+        var mode = normalizeMode(exercise.mode);
         app.innerHTML =
             '<section class="author-meta">' +
             '<label>Title <input id="exTitle" type="text" value="' + escapeHtml(exercise.title || '') + '"></label>' +
             '<label>Prompt <textarea id="exPrompt" rows="3">' + escapeHtml(exercise.prompt || '') + '</textarea></label>' +
+            '<label>Assignment instructions URL <span class="hint">(optional link shown to learners)</span>' +
+            '<input id="exInstructionsUrl" type="url" placeholder="https://www.dj4e.com/assn/…" value="' +
+            escapeHtml(exercise.instructions_url || '') + '"></label>' +
             '<label>Mode' +
             '<select id="exMode">' +
             '<option value="query"' + (mode === 'query' ? ' selected' : '') + '>query — compare SELECT results</option>' +
             '<option value="database-state"' + (mode === 'database-state' ? ' selected' : '') +
             '>database-state — compare verification queries after DDL/DML</option>' +
+            '<option value="upload-check"' + (mode === 'upload-check' ? ' selected' : '') +
+            '>upload-check — upload SQLite file; compare verification queries</option>' +
             '</select></label>' +
-            '<label>Starter SQL for learners <span class="hint">(shown in their editor; leave blank for empty)</span>' +
+            '<label id="starterBlock">Starter SQL for learners <span class="hint">(shown in their editor; leave blank for empty)</span>' +
             '<textarea id="exStarter" class="code" rows="4" spellcheck="false">' +
             escapeHtml(exercise.starter_sql || '') + '</textarea></label>' +
             '</section>' +
             '<section class="split">' +
             '<div class="pane">' +
-            '<h2>Solution <span class="hint">learner goal SQL</span></h2>' +
+            '<h2>Solution <span class="hint" id="solutionHint">learner goal SQL</span></h2>' +
             '<textarea id="exSolution" class="code" spellcheck="false">' +
             escapeHtml(exercise.solution_sql || '') + '</textarea>' +
             '<button type="button" id="btnRun" class="btn btn-primary">Run query</button>' +
             '</div>' +
             '<div class="pane">' +
-            '<h2>Setup <span class="hint">setup.sql (optional in database-state)</span></h2>' +
+            '<h2>Setup <span class="hint" id="setupHint">setup.sql</span></h2>' +
             '<textarea id="exSetup" class="code" spellcheck="false">' +
             escapeHtml(exercise.setup_sql || '') + '</textarea>' +
             '</div>' +
             '</section>' +
             '<section id="verifyBlock" class="verify-block">' +
-            '<h2>Verification SQL <span class="hint">one or more queries, separated by semicolons — used only in database-state mode</span></h2>' +
+            '<h2>Verification SQL <span class="hint" id="verifyHint">one or more queries, separated by semicolons</span></h2>' +
             '<textarea id="exVerify" class="code" rows="5" spellcheck="false">' +
             escapeHtml(verificationToText(exercise.verification_sql)) + '</textarea>' +
             '</section>' +
@@ -304,23 +389,43 @@
         }
     }
 
+    function safeHttpUrl(url) {
+        var s = String(url || '').trim();
+        if (!s) return '';
+        if (!/^https?:\/\//i.test(s)) return '';
+        return s;
+    }
+
+    function instructionsLinkHtml(ex) {
+        var url = safeHttpUrl(ex && ex.instructions_url);
+        if (!url) return '';
+        return '<p class="instructions-link">' +
+            '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">' +
+            'Assignment instructions</a></p>';
+    }
+
     function collectExerciseFromForm() {
-        var mode = document.getElementById('exMode').value === 'database-state'
-            ? 'database-state'
-            : 'query';
+        var mode = normalizeMode(document.getElementById('exMode').value);
         var verification = textToVerification(document.getElementById('exVerify').value);
-        var compatibility = mode === 'database-state'
+        var compatibility = (mode === 'database-state' || mode === 'upload-check')
             ? ['dbgrader']
             : (exercise.compatibility || ['dbgrader', 'udemy']);
-        return {
+        var starterEl = document.getElementById('exStarter');
+        var instructionsUrl = '';
+        var instructionsEl = document.getElementById('exInstructionsUrl');
+        if (instructionsEl) {
+            instructionsUrl = instructionsEl.value.trim();
+        }
+        var out = {
             version: exercise.version || 1,
             type: 'sqlite',
             mode: mode,
             title: document.getElementById('exTitle').value.trim(),
             prompt: document.getElementById('exPrompt').value,
+            instructions_url: instructionsUrl,
             setup_sql: document.getElementById('exSetup').value,
             solution_sql: document.getElementById('exSolution').value,
-            starter_sql: document.getElementById('exStarter').value,
+            starter_sql: starterEl ? starterEl.value : (exercise.starter_sql || ''),
             verification_sql: verification,
             hints: exercise.hints || [],
             comparison: exercise.comparison || {
@@ -332,14 +437,27 @@
             dialect: exercise.dialect || 'sqlite',
             compatibility: compatibility
         };
+        // Keep built-in identity so Settings can tell when to reload a different assignment.
+        var builtinKey = cfg.assignmentKey || exercise.builtin || null;
+        if (builtinKey) {
+            out.builtin = builtinKey;
+        }
+        return out;
     }
 
     function authorRun() {
         var ex = collectExerciseFromForm();
         var status = document.getElementById('runStatus');
         var panel = document.getElementById('runPanel');
-        if (ex.mode === 'database-state' && (!ex.verification_sql || !ex.verification_sql.length)) {
-            setStatus(status, 'error', 'Add at least one verification query for database-state mode.');
+        if ((ex.mode === 'database-state' || ex.mode === 'upload-check')
+            && (!ex.verification_sql || !ex.verification_sql.length)) {
+            setStatus(status, 'error', 'Add at least one verification query for ' + ex.mode + ' mode.');
+            return;
+        }
+        if (ex.mode === 'upload-check'
+            && !String(ex.setup_sql || '').trim()
+            && !String(ex.solution_sql || '').trim()) {
+            setStatus(status, 'error', 'Provide setup and/or solution SQL to build the expected reference database.');
             return;
         }
         setStatus(status, 'pending', 'Running…');
@@ -356,17 +474,39 @@
     function authorSave() {
         var ex = collectExerciseFromForm();
         var msg = document.getElementById('saveMsg');
-        if (!ex.prompt.trim() || !ex.solution_sql.trim()) {
-            msg.textContent = 'Prompt and solution SQL are required.';
+        if (!ex.prompt.trim()) {
+            msg.textContent = 'Prompt is required.';
             return;
         }
-        if (ex.mode === 'query' && !ex.setup_sql.trim()) {
-            msg.textContent = 'Setup SQL is required for query mode.';
-            return;
+        if (ex.mode === 'query') {
+            if (!ex.solution_sql.trim()) {
+                msg.textContent = 'Solution SQL is required for query mode.';
+                return;
+            }
+            if (!ex.setup_sql.trim()) {
+                msg.textContent = 'Setup SQL is required for query mode.';
+                return;
+            }
         }
-        if (ex.mode === 'database-state' && (!ex.verification_sql || !ex.verification_sql.length)) {
-            msg.textContent = 'Verification SQL is required for database-state mode.';
-            return;
+        if (ex.mode === 'database-state') {
+            if (!ex.solution_sql.trim()) {
+                msg.textContent = 'Solution SQL is required for database-state mode.';
+                return;
+            }
+            if (!ex.verification_sql || !ex.verification_sql.length) {
+                msg.textContent = 'Verification SQL is required for database-state mode.';
+                return;
+            }
+        }
+        if (ex.mode === 'upload-check') {
+            if (!ex.verification_sql || !ex.verification_sql.length) {
+                msg.textContent = 'Verification SQL is required for upload-check mode.';
+                return;
+            }
+            if (!ex.setup_sql.trim() && !ex.solution_sql.trim()) {
+                msg.textContent = 'Setup and/or solution SQL is required to build the expected reference database.';
+                return;
+            }
         }
         if (!cfg.urls || !cfg.urls.save) {
             msg.textContent = 'Save URL missing.';
@@ -397,10 +537,15 @@
     // ---- Learner view ----
     function renderLearner() {
         document.getElementById('exerciseTitle').textContent = exercise.title || 'SQL exercise';
+        if (normalizeMode(exercise.mode) === 'upload-check') {
+            renderLearnerUpload();
+            return;
+        }
         app.innerHTML =
             '<section class="prompt-block">' +
             '<h1>' + escapeHtml(exercise.title || 'SQL exercise') + '</h1>' +
             '<p class="prompt">' + escapeHtml(exercise.prompt || '') + '</p>' +
+            instructionsLinkHtml(exercise) +
             '</section>' +
             '<section class="editor-block">' +
             '<h2>Your SQL</h2>' +
@@ -425,6 +570,105 @@
             document.getElementById('runStatus').textContent = '';
             document.getElementById('runStatus').className = 'status';
         });
+    }
+
+    function renderLearnerUpload() {
+        app.innerHTML =
+            '<section class="prompt-block">' +
+            '<h1>' + escapeHtml(exercise.title || 'Upload and check') + '</h1>' +
+            '<p class="prompt">' + escapeHtml(exercise.prompt || '') + '</p>' +
+            instructionsLinkHtml(exercise) +
+            '</section>' +
+            '<section class="upload-block">' +
+            '<h2>Your SQLite database</h2>' +
+            '<p class="muted">Upload a <code>.sqlite3</code> file (also accepts <code>.sqlite</code> / <code>.db</code>), max 3M.</p>' +
+            '<label class="upload-label">Database file' +
+            '<input id="learnerDbFile" type="file" accept=".sqlite3,.sqlite,.db,application/x-sqlite3">' +
+            '</label>' +
+            '<div class="btn-row">' +
+            '<button type="button" id="btnExplore" class="btn btn-secondary">Explore (.tables)</button>' +
+            '<button type="button" id="btnCheck" class="btn btn-primary">Check database</button>' +
+            '</div>' +
+            '</section>' +
+            '<section class="result-section">' +
+            '<div class="result-header"><h2>Result</h2><span id="runStatus" class="status"></span></div>' +
+            '<div id="runPanel"></div>' +
+            '</section>';
+
+        document.getElementById('btnExplore').addEventListener('click', learnerExploreUpload);
+        document.getElementById('btnCheck').addEventListener('click', learnerCheckUpload);
+    }
+
+    function getSelectedUploadFile() {
+        var input = document.getElementById('learnerDbFile');
+        return input && input.files && input.files[0] ? input.files[0] : null;
+    }
+
+    function learnerExploreUpload() {
+        var file = getSelectedUploadFile();
+        var status = document.getElementById('runStatus');
+        var panel = document.getElementById('runPanel');
+        var err = validateUploadFile(file);
+        if (err) {
+            setStatus(status, 'error', err);
+            return;
+        }
+        setStatus(status, 'pending', 'Opening database…');
+        panel.innerHTML = '';
+        readFileAsArrayBuffer(file)
+            .then(function (buf) {
+                return callWorker('execute', {
+                    exercise: exercise,
+                    submission_sql: '.tables',
+                    db_bytes: buf
+                });
+            })
+            .then(function (data) {
+                var label = data.phase === 'meta' ? 'Meta: ' + (data.meta || 'ok') : 'Success';
+                showResult(panel, status, 'success', label, data.result, null, data.results, data.notice);
+            })
+            .catch(function (e) {
+                showError(panel, status, e);
+            });
+    }
+
+    function learnerCheckUpload() {
+        var file = getSelectedUploadFile();
+        var status = document.getElementById('runStatus');
+        var panel = document.getElementById('runPanel');
+        var err = validateUploadFile(file);
+        if (err) {
+            setStatus(status, 'error', err);
+            return;
+        }
+        setStatus(status, 'pending', 'Checking database…');
+        panel.innerHTML = '';
+        recordAttempt();
+        readFileAsArrayBuffer(file)
+            .then(function (buf) {
+                return callWorker('grade', { exercise: exercise, db_bytes: buf });
+            })
+            .then(function (data) {
+                var kind = data.passed ? 'success' : 'fail';
+                var label = data.passed ? 'Correct' : 'Not yet';
+                var display = data.actual;
+                var results = data.results || (data.actual && data.actual.results);
+                showResult(panel, status, kind, label, display, data.feedback, results);
+                if (data.passed) {
+                    return submitGrade(1.0).then(function (resp) {
+                        if (resp && resp.status === 'success') {
+                            setStatus(status, 'success', 'Correct — grade submitted');
+                        } else if (resp && resp.detail) {
+                            setStatus(status, 'success', 'Correct — grade note: ' + resp.detail);
+                        }
+                    }).catch(function (e) {
+                        setStatus(status, 'success', 'Correct — grade send failed: ' + e.message);
+                    });
+                }
+            })
+            .catch(function (e) {
+                showError(panel, status, e);
+            });
     }
 
     function learnerRun() {

@@ -241,6 +241,27 @@ FROM sqlite_schema
 WHERE name = 'table_name';
 ```
 
+### Upload-Check Mode
+
+Upload-check mode grades a learner-uploaded SQLite database file in the browser (WASM), without sending the file to the server for grading.
+
+The grader:
+
+1. builds an expected reference database from `setup_sql` and optional `solution_sql`;
+2. runs one or more `verification_sql` queries and captures expected results;
+3. opens the uploaded SQLite file read-only (`sqlite3_deserialize`);
+4. runs the same verification queries on the uploaded database;
+5. compares the verification result lists.
+
+Typical uses:
+
+- Django / project `db.sqlite3` schema and row-count checks (for example Polls batch load);
+- any exercise where the learner produces a SQLite file outside the tool.
+
+Prefer count and filtered verification queries over dumping entire tables so volatile `id` or timestamp columns do not cause false failures.
+
+Upload-check exercises are DBGrader-only (`compatibility: ["dbgrader"]`).
+
 ## Exercise JSON Format
 
 Initial format:

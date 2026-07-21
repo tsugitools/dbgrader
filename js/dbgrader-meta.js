@@ -6,7 +6,7 @@
     'use strict';
 
     var HELP_TEXT = [
-        '.tables / SHOW TABLES / \\dt       List tables',
+        '.tables / SHOW TABLES / \\dt       List tables (with row counts)',
         '.schema [table] / \\d [table]      Schema / describe relation',
         '.indexes [table] / \\di            List indexes',
         '\\dv                               List views',
@@ -169,13 +169,17 @@
         }
 
         if (name === 'tables') {
-            var tablesSql = "SELECT name AS 'Tables_in_main' FROM sqlite_schema " +
+            var tablesSql = "SELECT name AS 'Table' FROM sqlite_schema " +
                 "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'";
             if (meta.like) {
                 tablesSql += ' AND name LIKE ' + likePatternSql(meta.like);
             }
             tablesSql += ' ORDER BY name';
-            return [{ label: 'tables', sql: tablesSql }];
+            return [{
+                label: 'tables',
+                sql: tablesSql,
+                withRowCounts: true
+            }];
         }
 
         if (name === 'views') {

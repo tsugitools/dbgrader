@@ -24,6 +24,28 @@ use \Tsugi\Util\U;
 use \Tsugi\UI\Lessons;
 
 /**
+ * Content-hash cache-bust token for the Web Worker and its importScripts.
+ * Main-thread CSS/JS can rely on a normal shift-reload.
+ */
+function dbgrader_asset_bust() {
+    static $bust = null;
+    if ($bust !== null) {
+        return $bust;
+    }
+    $files = array(
+        __DIR__ . '/js/dbgrader-worker.js',
+        __DIR__ . '/js/dbgrader-meta.js',
+        __DIR__ . '/js/dbgrader-compare.js',
+    );
+    $parts = array();
+    foreach ($files as $path) {
+        $parts[] = is_readable($path) ? md5_file($path) : '';
+    }
+    $bust = substr(md5(implode('|', $parts)), 0, 12);
+    return $bust;
+}
+
+/**
  * Empty exercise when nothing is configured yet.
  */
 function dbgrader_empty_exercise() {
@@ -143,6 +165,9 @@ function dbgrader_load_custom_exercise() {
 /**
  * Load exercise from link JSON; else custom config; else built-in; else empty.
  *
+ * When Settings has a built-in exercise key, that wins over stale link JSON whose
+ * `builtin` field does not match (so switching assignments in Settings updates Edit).
+ *
  * @return array{exercise: array, assignmentKey: ?string}
  */
 function dbgrader_load_exercise($LINK) {
@@ -153,6 +178,31 @@ function dbgrader_load_exercise($LINK) {
         $raw = $LINK->getJson();
     }
     $existing = dbgrader_decode_exercise_json($raw);
+
+    // Settings selected a built-in that is not what the link JSON was loaded from.
+    if ($assignmentKey) {
+        $builtin = dbgrader_builtin_exercise($assignmentKey);
+        if ($builtin) {
+            $jsonBuiltin = (is_array($existing) && isset($existing['builtin']))
+                ? $existing['builtin']
+                : null;
+            if (!$existing || $jsonBuiltin !== $assignmentKey) {
+                if ($LINK && method_exists($LINK, 'setJson') && !empty($LINK->id)) {
+                    $LINK->setJson(json_encode($builtin));
+                }
+                return array(
+                    'exercise' => $builtin,
+                    'assignmentKey' => $assignmentKey,
+                );
+            }
+            // Same built-in as JSON — keep the (possibly edited) link copy.
+            return array(
+                'exercise' => $existing,
+                'assignmentKey' => $assignmentKey,
+            );
+        }
+    }
+
     if ($existing) {
         return array(
             'exercise' => $existing,
@@ -169,20 +219,6 @@ function dbgrader_load_exercise($LINK) {
             'exercise' => $fromCustom,
             'assignmentKey' => $assignmentKey,
         );
-    }
-
-    if ($assignmentKey) {
-        $builtin = dbgrader_builtin_exercise($assignmentKey);
-        if ($builtin) {
-            // Seed link JSON so Edit / Save have a real placement copy.
-            if ($LINK && method_exists($LINK, 'setJson') && !empty($LINK->id)) {
-                $LINK->setJson(json_encode($builtin));
-            }
-            return array(
-                'exercise' => $builtin,
-                'assignmentKey' => $assignmentKey,
-            );
-        }
     }
 
     return array(

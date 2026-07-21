@@ -70,10 +70,11 @@ If the LMS dropped customs, `?inherit=<resource_link_id>` reloads the `config` b
 ## Learner
 
 1. Read the prompt
-2. **Run** exploratory queries (not graded) — including `.tables`, `SHOW TABLES`, `\dt`, `\d table`, `\di`, `\dv`, `\l`, `DESCRIBE table` / `DESC table`, `SHOW CREATE TABLE`, `.help` / `\?`
-3. **Check Answer** to grade:
+2. For SQL modes: **Run** exploratory queries (not graded) — including `.tables`, `SHOW TABLES`, `\dt`, `\d table`, `\di`, `\dv`, `\l`, `DESCRIBE table` / `DESC table`, `SHOW CREATE TABLE`, `.help` / `\?`
+3. **Check Answer** / **Check database** to grade:
    - **query** mode: compare SELECT result to the solution
    - **database-state** mode: run your (possibly multi-statement) SQL, then compare verification queries
+   - **upload-check** mode: upload a `.sqlite3` file; verification queries run on a gold DB and on your file
 
 ## Modes
 
@@ -81,6 +82,9 @@ If the LMS dropped customs, `?inherit=<resource_link_id>` reloads the `config` b
 |------|-----------|
 | `query` | Result of learner SELECT vs solution SELECT |
 | `database-state` | Results of `verification_sql` after solution vs after learner SQL |
+| `upload-check` | Same `verification_sql` on expected reference DB vs uploaded SQLite file |
+
+Built-in upload example: **PollsExercise** (`Polls Loading One-to-Many Data`).
 
 ## Install
 

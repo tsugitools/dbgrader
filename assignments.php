@@ -13,6 +13,7 @@
 $assignments = array(
     'PantryExercise' => 'Pantry Items Over 30 Ounces',
     'SimpleWhereExercise' => 'A Simple Query with a WHERE clause',
+    'PollsExercise' => 'Polls Loading One-to-Many Data',
 );
 
 /**
