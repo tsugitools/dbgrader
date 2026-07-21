@@ -57,7 +57,11 @@
         if (result.columns.length === 0 && (!result.rows || result.rows.length === 0)) {
             return '<p class="muted">Query succeeded with an empty result.</p>';
         }
-        var html = '<div class="result-table-wrap"><table class="result-table"><thead><tr>';
+        var html = '';
+        if (result.label) {
+            html += '<h3 class="result-label">' + escapeHtml(result.label) + '</h3>';
+        }
+        html += '<div class="result-table-wrap"><table class="result-table"><thead><tr>';
         result.columns.forEach(function (c) {
             html += '<th>' + escapeHtml(c) + '</th>';
         });
@@ -74,20 +78,31 @@
         return html;
     }
 
+    function renderResults(result, results) {
+        if (results && results.length) {
+            return results.map(renderTable).join('');
+        }
+        return renderTable(result);
+    }
+
     function setStatus(el, kind, text) {
         el.className = 'status status-' + kind;
         el.textContent = text;
     }
 
-    function showResult(panel, statusEl, kind, label, result, feedback) {
+    function showResult(panel, statusEl, kind, label, result, feedback, results, notice) {
         setStatus(statusEl, kind, label);
         var fb = '';
         if (feedback && feedback.length) {
-            fb = '<ul class="feedback">' + feedback.map(function (f) {
+            fb += '<ul class="feedback">' + feedback.map(function (f) {
                 return '<li>' + escapeHtml(f) + '</li>';
             }).join('') + '</ul>';
         }
-        panel.innerHTML = fb + renderTable(result);
+        var html = fb + renderResults(result, results);
+        if (notice) {
+            html += '<p class="compat-notice">' + escapeHtml(notice) + '</p>';
+        }
+        panel.innerHTML = html;
     }
 
     function showError(panel, statusEl, err) {
@@ -96,33 +111,71 @@
         if (phase === 'setup') prefix = 'Setup SQL error';
         else if (phase === 'solution') prefix = 'Solution SQL error';
         else if (phase === 'submission') prefix = 'Your SQL error';
+        else if (phase === 'verification') prefix = 'Verification SQL error';
+        else if (phase === 'meta') prefix = 'Meta-command error';
         setStatus(statusEl, 'error', prefix);
         panel.innerHTML = '<pre class="error-detail">' + escapeHtml(err.message || String(err)) + '</pre>';
+    }
+
+    function verificationToText(v) {
+        if (Array.isArray(v)) return v.join(';\n');
+        return v || '';
+    }
+
+    function textToVerification(text) {
+        return String(text || '')
+            .split(';')
+            .map(function (s) { return s.trim(); })
+            .filter(Boolean);
+    }
+
+    function syncAuthorModeUi() {
+        var modeEl = document.getElementById('exMode');
+        var verifyBlock = document.getElementById('verifyBlock');
+        if (!modeEl || !verifyBlock) return;
+        var isState = modeEl.value === 'database-state';
+        verifyBlock.hidden = !isState;
+        var runBtn = document.getElementById('btnRun');
+        if (runBtn) {
+            runBtn.textContent = isState ? 'Run verification preview' : 'Run query';
+        }
     }
 
     // ---- Author view ----
     function renderAuthor() {
         document.getElementById('exerciseTitle').textContent = exercise.title || 'Author exercise';
+        var mode = exercise.mode === 'database-state' ? 'database-state' : 'query';
         app.innerHTML =
             '<section class="author-meta">' +
             '<label>Title <input id="exTitle" type="text" value="' + escapeHtml(exercise.title || '') + '"></label>' +
             '<label>Prompt <textarea id="exPrompt" rows="3">' + escapeHtml(exercise.prompt || '') + '</textarea></label>' +
+            '<label>Mode' +
+            '<select id="exMode">' +
+            '<option value="query"' + (mode === 'query' ? ' selected' : '') + '>query — compare SELECT results</option>' +
+            '<option value="database-state"' + (mode === 'database-state' ? ' selected' : '') +
+            '>database-state — compare verification queries after DDL/DML</option>' +
+            '</select></label>' +
             '<label>Starter SQL for learners <span class="hint">(shown in their editor; leave blank for empty)</span>' +
             '<textarea id="exStarter" class="code" rows="4" spellcheck="false">' +
             escapeHtml(exercise.starter_sql || '') + '</textarea></label>' +
             '</section>' +
             '<section class="split">' +
             '<div class="pane">' +
-            '<h2>Solution <span class="hint">query.sql</span></h2>' +
+            '<h2>Solution <span class="hint">learner goal SQL</span></h2>' +
             '<textarea id="exSolution" class="code" spellcheck="false">' +
             escapeHtml(exercise.solution_sql || '') + '</textarea>' +
             '<button type="button" id="btnRun" class="btn btn-primary">Run query</button>' +
             '</div>' +
             '<div class="pane">' +
-            '<h2>Evaluation <span class="hint">setup.sql</span></h2>' +
+            '<h2>Setup <span class="hint">setup.sql (optional in database-state)</span></h2>' +
             '<textarea id="exSetup" class="code" spellcheck="false">' +
             escapeHtml(exercise.setup_sql || '') + '</textarea>' +
             '</div>' +
+            '</section>' +
+            '<section id="verifyBlock" class="verify-block">' +
+            '<h2>Verification SQL <span class="hint">one or more queries, separated by semicolons — used only in database-state mode</span></h2>' +
+            '<textarea id="exVerify" class="code" rows="5" spellcheck="false">' +
+            escapeHtml(verificationToText(exercise.verification_sql)) + '</textarea>' +
             '</section>' +
             '<section class="result-section">' +
             '<div class="result-header"><h2>Result</h2><span id="runStatus" class="status"></span></div>' +
@@ -152,6 +205,8 @@
             '</div>' +
             '</div>';
 
+        document.getElementById('exMode').addEventListener('change', syncAuthorModeUi);
+        syncAuthorModeUi();
         document.getElementById('btnRun').addEventListener('click', authorRun);
         document.getElementById('btnSave').addEventListener('click', authorSave);
         document.getElementById('btnViewJson').addEventListener('click', openJsonModal);
@@ -238,16 +293,23 @@
     }
 
     function collectExerciseFromForm() {
+        var mode = document.getElementById('exMode').value === 'database-state'
+            ? 'database-state'
+            : 'query';
+        var verification = textToVerification(document.getElementById('exVerify').value);
+        var compatibility = mode === 'database-state'
+            ? ['dbgrader']
+            : (exercise.compatibility || ['dbgrader', 'udemy']);
         return {
             version: exercise.version || 1,
             type: 'sqlite',
-            mode: 'query',
+            mode: mode,
             title: document.getElementById('exTitle').value.trim(),
             prompt: document.getElementById('exPrompt').value,
             setup_sql: document.getElementById('exSetup').value,
             solution_sql: document.getElementById('exSolution').value,
             starter_sql: document.getElementById('exStarter').value,
-            verification_sql: exercise.verification_sql || [],
+            verification_sql: verification,
             hints: exercise.hints || [],
             comparison: exercise.comparison || {
                 column_names: true,
@@ -256,7 +318,7 @@
                 numeric_tolerance: 0
             },
             dialect: exercise.dialect || 'sqlite',
-            compatibility: exercise.compatibility || ['dbgrader', 'udemy']
+            compatibility: compatibility
         };
     }
 
@@ -264,11 +326,15 @@
         var ex = collectExerciseFromForm();
         var status = document.getElementById('runStatus');
         var panel = document.getElementById('runPanel');
+        if (ex.mode === 'database-state' && (!ex.verification_sql || !ex.verification_sql.length)) {
+            setStatus(status, 'error', 'Add at least one verification query for database-state mode.');
+            return;
+        }
         setStatus(status, 'pending', 'Running…');
         panel.innerHTML = '';
         callWorker('preview', { exercise: ex })
             .then(function (data) {
-                showResult(panel, status, 'success', 'Success', data.result);
+                showResult(panel, status, 'success', 'Success', data.result, null, data.results);
             })
             .catch(function (err) {
                 showError(panel, status, err);
@@ -278,8 +344,16 @@
     function authorSave() {
         var ex = collectExerciseFromForm();
         var msg = document.getElementById('saveMsg');
-        if (!ex.prompt.trim() || !ex.setup_sql.trim() || !ex.solution_sql.trim()) {
-            msg.textContent = 'Prompt, setup SQL, and solution SQL are required.';
+        if (!ex.prompt.trim() || !ex.solution_sql.trim()) {
+            msg.textContent = 'Prompt and solution SQL are required.';
+            return;
+        }
+        if (ex.mode === 'query' && !ex.setup_sql.trim()) {
+            msg.textContent = 'Setup SQL is required for query mode.';
+            return;
+        }
+        if (ex.mode === 'database-state' && (!ex.verification_sql || !ex.verification_sql.length)) {
+            msg.textContent = 'Verification SQL is required for database-state mode.';
             return;
         }
         if (!cfg.urls || !cfg.urls.save) {
@@ -311,10 +385,15 @@
     // ---- Learner view ----
     function renderLearner() {
         document.getElementById('exerciseTitle').textContent = exercise.title || 'SQL exercise';
+        var mode = exercise.mode === 'database-state' ? 'database-state' : 'query';
+        var modeNote = mode === 'database-state'
+            ? '<p class="mode-note">Mode: <strong>database-state</strong> — your SQL may include multiple statements. Grading checks verification queries. Explore with <code>SHOW TABLES</code>, <code>DESCRIBE table</code>, or <code>.help</code>.</p>'
+            : '<p class="mode-note">Mode: <strong>query</strong> — write a SELECT whose result matches the solution. Explore with <code>.tables</code>, <code>SHOW TABLES</code>, <code>DESCRIBE table</code>, or <code>.help</code> (not graded).</p>';
         app.innerHTML =
             '<section class="prompt-block">' +
             '<h1>' + escapeHtml(exercise.title || 'SQL exercise') + '</h1>' +
             '<p class="prompt">' + escapeHtml(exercise.prompt || '') + '</p>' +
+            modeNote +
             '</section>' +
             '<section class="editor-block">' +
             '<h2>Your SQL</h2>' +
@@ -353,7 +432,8 @@
         panel.innerHTML = '';
         callWorker('execute', { exercise: exercise, submission_sql: sql })
             .then(function (data) {
-                showResult(panel, status, 'success', 'Success', data.result);
+                var label = data.phase === 'meta' ? 'Meta: ' + (data.meta || 'ok') : 'Success';
+                showResult(panel, status, 'success', label, data.result, null, data.results, data.notice);
             })
             .catch(function (err) {
                 showError(panel, status, err);
@@ -396,7 +476,9 @@
             .then(function (data) {
                 var kind = data.passed ? 'success' : 'fail';
                 var label = data.passed ? 'Correct' : 'Not yet';
-                showResult(panel, status, kind, label, data.actual, data.feedback);
+                var display = data.actual;
+                var results = data.results || (data.actual && data.actual.results);
+                showResult(panel, status, kind, label, display, data.feedback, results);
                 if (data.passed) {
                     return submitGrade(1.0).then(function (resp) {
                         if (resp && resp.status === 'success') {

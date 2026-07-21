@@ -53,8 +53,17 @@ If the LMS dropped customs, `?inherit=<resource_link_id>` reloads that block fro
 ## Learner
 
 1. Read the prompt
-2. **Run** exploratory queries (not graded)
-3. **Check Answer** to compare against the instructor solution and send a grade on success
+2. **Run** exploratory queries (not graded) — including `.tables`, `SHOW TABLES`, `DESCRIBE table` / `DESC table`, `SHOW CREATE TABLE`, `SHOW INDEX FROM table`, `.help`
+3. **Check Answer** to grade:
+   - **query** mode: compare SELECT result to the solution
+   - **database-state** mode: run your (possibly multi-statement) SQL, then compare verification queries
+
+## Modes
+
+| Mode | Graded by |
+|------|-----------|
+| `query` | Result of learner SELECT vs solution SELECT |
+| `database-state` | Results of `verification_sql` after solution vs after learner SQL |
 
 ## Install
 

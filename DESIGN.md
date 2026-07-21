@@ -814,7 +814,7 @@ mod/dbgrader/
 │   ├── dbgrader.js            # Author + learner UI
 │   ├── dbgrader-worker.js     # SQLite WASM worker
 │   ├── dbgrader-compare.js
-│   ├── dbgrader-meta.js       # (later)
+│   ├── dbgrader-meta.js       # .tables / .schema / .describe / …
 │   ├── dbgrader-dialects.js   # (later)
 │   └── dbgrader-base64.js     # (later)
 ├── css/

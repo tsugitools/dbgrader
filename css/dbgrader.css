@@ -83,9 +83,68 @@ body {
     font: inherit;
 }
 
-.author-meta textarea.code {
-    min-height: 6rem;
+.author-meta select {
+    width: 100%;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.6rem 0.75rem;
+    font: inherit;
 }
+
+.verify-block {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 1rem;
+}
+
+.verify-block[hidden] { display: none !important; }
+
+.verify-block h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+}
+
+.verify-block textarea.code {
+    width: 100%;
+    min-height: 7rem;
+}
+
+.mode-note {
+    margin: 0.75rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.mode-note code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--panel-2);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+}
+
+.compat-notice {
+    margin: 0.75rem 0 0;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    color: #5b4a1f;
+    background: #fff8e1;
+    border: 1px solid #f0e0a0;
+    border-radius: 4px;
+}
+
+.result-label {
+    margin: 0.75rem 0 0.35rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.result-label:first-child { margin-top: 0; }
 
 .split {
     display: grid;

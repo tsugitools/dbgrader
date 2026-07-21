@@ -141,7 +141,47 @@
         };
     }
 
+    /**
+     * Compare arrays of result sets (database-state verification).
+     * Each entry: { columns, rows } or { label, columns, rows }
+     */
+    function compareResultLists(expectedList, actualList, options) {
+        expectedList = expectedList || [];
+        actualList = actualList || [];
+        var feedback = [];
+
+        if (expectedList.length !== actualList.length) {
+            feedback.push(
+                'Expected ' + expectedList.length + ' verification result(s) but received ' +
+                actualList.length + '.'
+            );
+        }
+
+        var passed = expectedList.length === actualList.length;
+        var n = Math.min(expectedList.length, actualList.length);
+        for (var i = 0; i < n; i++) {
+            var label = expectedList[i].label || ('verification ' + (i + 1));
+            var cmp = compareResults(expectedList[i], actualList[i], options);
+            if (!cmp.passed) {
+                passed = false;
+                feedback.push('Mismatch in ' + label + ':');
+                cmp.feedback.forEach(function (f) {
+                    feedback.push('  ' + f);
+                });
+            }
+        }
+
+        if (passed && feedback.length === 0) {
+            feedback = ['Correct — verification queries match the expected database state.'];
+        } else if (!passed && feedback.length === 0) {
+            feedback = ['Verification results do not match.'];
+        }
+
+        return { passed: passed, feedback: feedback };
+    }
+
     global.DBGraderCompare = {
-        compareResults: compareResults
+        compareResults: compareResults,
+        compareResultLists: compareResultLists
     };
 })(typeof window !== 'undefined' ? window : self);

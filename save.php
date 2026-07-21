@@ -33,9 +33,28 @@ if (!is_array($exercise)) {
     return;
 }
 
-if (!isset($exercise['setup_sql'], $exercise['solution_sql'], $exercise['prompt'])) {
+if (!isset($exercise['solution_sql'], $exercise['prompt'])) {
     http_response_code(400);
-    echo json_encode(array('status' => 'failure', 'detail' => 'Missing required fields: prompt, setup_sql, solution_sql'));
+    echo json_encode(array('status' => 'failure', 'detail' => 'Missing required fields: prompt, solution_sql'));
+    return;
+}
+
+if (!isset($exercise['setup_sql'])) {
+    $exercise['setup_sql'] = '';
+}
+
+$mode = isset($exercise['mode']) ? $exercise['mode'] : 'query';
+if ($mode === 'database-state') {
+    $verify = isset($exercise['verification_sql']) ? $exercise['verification_sql'] : null;
+    $hasVerify = is_array($verify) ? count($verify) > 0 : (is_string($verify) && strlen(trim($verify)) > 0);
+    if (!$hasVerify) {
+        http_response_code(400);
+        echo json_encode(array('status' => 'failure', 'detail' => 'database-state mode requires verification_sql'));
+        return;
+    }
+} else if (!strlen(trim($exercise['setup_sql']))) {
+    http_response_code(400);
+    echo json_encode(array('status' => 'failure', 'detail' => 'query mode requires setup_sql'));
     return;
 }
 
