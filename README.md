@@ -30,8 +30,25 @@ As instructor, open **Author** (or `index.php?mode=author`):
 
 1. Edit title and prompt
 2. Write **setup.sql** (left as Evaluation) and **solution.sql**
-3. **Run query** to preview expected results
-4. **Save** to the placement JSON
+3. Optionally set **Starter SQL** for the learner editor
+4. **Run query** to preview expected results
+5. **Save** to the placement JSON
+6. **View Assignment JSON** — copy the exercise object, or the `lessons.json` `custom` snippet (`key: config`)
+
+### Preload from lessons.json
+
+On first launch with an empty link JSON, DBGrader seeds from LTI `custom_config` (same pattern as peer-grade CSS):
+
+```json
+"custom": [
+  {
+    "key": "config",
+    "json": { "...": "exercise object" }
+  }
+]
+```
+
+If the LMS dropped customs, `?inherit=<resource_link_id>` reloads that block from `$CFG->lessons`.
 
 ## Learner
 

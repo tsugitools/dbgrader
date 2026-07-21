@@ -1,7 +1,26 @@
 <?php
 /**
+ * Exercise defaults and first-launch load from LTI custom / lessons.json.
+ *
+ * lessons.json pattern (same shape as peer-grade CSS "config"):
+ *
+ *   "custom": [
+ *     {
+ *       "key": "config",
+ *       "json": { ... exercise object ... }
+ *     }
+ *   ]
+ *
+ * On first launch with an empty lti_link.json, that custom (or ?inherit=)
+ * is copied into the link JSON once.
+ */
+
+use \Tsugi\Core\LTIX;
+use \Tsugi\Util\U;
+use \Tsugi\UI\Lessons;
+
+/**
  * Default pantry exercise when a placement has no JSON yet.
- * Matches the Udemy-style sample from DESIGN.md.
  */
 function dbgrader_default_exercise() {
     return array(
@@ -35,18 +54,87 @@ function dbgrader_default_exercise() {
 }
 
 /**
- * Load exercise from link JSON, or return the default sample.
+ * True if decoded array looks like a DBGrader exercise.
+ */
+function dbgrader_is_valid_exercise($decoded) {
+    return is_array($decoded)
+        && isset($decoded['setup_sql'], $decoded['solution_sql'], $decoded['prompt']);
+}
+
+/**
+ * Decode a JSON string into an exercise array, or null.
+ */
+function dbgrader_decode_exercise_json($raw) {
+    if (!$raw || !is_string($raw) || U::isEmpty($raw)) {
+        return null;
+    }
+    $decoded = json_decode($raw, true);
+    if (dbgrader_is_valid_exercise($decoded)) {
+        return $decoded;
+    }
+    return null;
+}
+
+/**
+ * Pull exercise JSON from LTI custom_config, then lessons.json via ?inherit=.
+ */
+function dbgrader_load_custom_exercise() {
+    global $CFG;
+
+    $custom = LTIX::ltiCustomGet('config');
+    $exercise = dbgrader_decode_exercise_json($custom);
+    if ($exercise) {
+        return $exercise;
+    }
+
+    if (isset($_GET['inherit']) && isset($CFG->lessons)) {
+        $lessons = new Lessons($CFG->lessons);
+        if ($lessons) {
+            $lti = $lessons->getLtiByRlid($_GET['inherit']);
+            if (isset($lti->custom) && is_array($lti->custom)) {
+                foreach ($lti->custom as $c) {
+                    if (isset($c->key, $c->json) && $c->key === 'config') {
+                        // json may already be an object/array from lessons decode
+                        if (is_string($c->json)) {
+                            $exercise = dbgrader_decode_exercise_json($c->json);
+                        } else {
+                            $asArray = json_decode(json_encode($c->json), true);
+                            if (dbgrader_is_valid_exercise($asArray)) {
+                                $exercise = $asArray;
+                            }
+                        }
+                        if ($exercise) {
+                            return $exercise;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Load exercise from link JSON; on first empty launch seed from custom/lessons.
  */
 function dbgrader_load_exercise($LINK) {
     $raw = null;
     if ($LINK && method_exists($LINK, 'getJson')) {
         $raw = $LINK->getJson();
     }
-    if ($raw) {
-        $decoded = json_decode($raw, true);
-        if (is_array($decoded) && isset($decoded['setup_sql'], $decoded['solution_sql'])) {
-            return $decoded;
-        }
+    $existing = dbgrader_decode_exercise_json($raw);
+    if ($existing) {
+        return $existing;
     }
+
+    $fromCustom = dbgrader_load_custom_exercise();
+    if ($fromCustom) {
+        if ($LINK && method_exists($LINK, 'setJson') && !empty($LINK->id)) {
+            $LINK->setJson(json_encode($fromCustom));
+        }
+        return $fromCustom;
+    }
+
     return dbgrader_default_exercise();
 }
