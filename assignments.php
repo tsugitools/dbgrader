@@ -10,20 +10,29 @@
  * only when the setting is not already set.
  */
 
-$assignments = array(
-    'PlaygroundExercise' => 'SQL Playground',
-    'PantryExercise' => 'Pantry Items Over 30 Ounces',
-    'SimpleWhereExercise' => 'A Simple Query with a WHERE clause',
-    'PollsExercise' => 'Polls Loading One-to-Many Data',
-    'ModelsExercise' => 'Django Models — Local Library Catalog',
-    'UnescoExercise' => 'Unesco Batch Loading One-to-Many Data',
-);
+/**
+ * Catalog of built-in exercises: key => label.
+ * Prefer this over $assignments from register.php — register is loaded inside
+ * a function, so a require_once of this file may not define $assignments there.
+ */
+function dbgrader_assignment_catalog() {
+    return array(
+        'PlaygroundExercise' => 'SQL Playground',
+        'PantryExercise' => 'Pantry Items Over 30 Ounces',
+        'SimpleWhereExercise' => 'A Simple Query with a WHERE clause',
+        'PollsExercise' => 'Polls Loading One-to-Many Data',
+        'ModelsExercise' => 'Django Models — Local Library Catalog',
+        'UnescoExercise' => 'Unesco Batch Loading One-to-Many Data',
+    );
+}
+
+$assignments = dbgrader_assignment_catalog();
 
 /**
  * Load a built-in exercise by key, or null if unknown / missing file.
  */
 function dbgrader_builtin_exercise($key) {
-    global $assignments;
+    $assignments = dbgrader_assignment_catalog();
     if (!$key || !is_string($key) || !isset($assignments[$key])) {
         return null;
     }
