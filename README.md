@@ -54,7 +54,9 @@ As instructor, open **Edit** (or `index.php?mode=author`):
 
 Instructors can also pick the assignment under **Settings**. Built-ins live in `assignments/` (catalog in `assignments.php`).
 
-**Alternate (inline exercise):** full JSON via `custom_config` still works when link JSON is empty:
+When Settings / LTI custom are both empty, `?exercise=PantryExercise` (a catalog key) seeds Settings the same way.
+
+**Alternate (inline exercise):** full JSON via `config` still works when link JSON is empty:
 
 ```json
 "custom": [
@@ -65,7 +67,12 @@ Instructors can also pick the assignment under **Settings**. Built-ins live in `
 ]
 ```
 
-If the LMS dropped customs, `?inherit=<resource_link_id>` reloads the `config` block from `$CFG->lessons`.
+If the LMS does not handle custom content well, we fall back to a GET parameter:
+
+- For a **built-in**, use `?exercise=<CatalogKey>` (exercise name, e.g. `PantryExercise`) when Settings is empty.
+- For an **inline `config`** exercise, use `?inherit=<resource_link_id>` to reload that block from `$CFG->lessons`.
+
+(First successful load is saved into `lti_link.json` when a link exists.)
 
 ## Learner
 

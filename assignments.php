@@ -7,7 +7,8 @@
  *   "custom": [ { "key": "exercise", "value": "PantryExercise" } ]
  *
  * Settings::linkGetCustom('exercise') copies that into the link settings row
- * only when the setting is not already set.
+ * only when the setting is not already set. Tools may also honor ?exercise=
+ * when nothing is configured yet (see exercise.php).
  */
 
 /**

@@ -137,12 +137,17 @@ SELECT COUNT(*) FROM orders;</div>
     "value": "PantryExercise"
   }
 ]</div>
-            <p>Load order: existing <code>lti_link.json</code> wins; else full <code>custom_config</code> JSON;
-               else the built-in named by the <code>exercise</code> setting; else an empty stub.</p>
+            <p>When Settings and LTI custom are both empty,
+               <code>?exercise=PantryExercise</code> (catalog exercise name) seeds Settings the same way.</p>
+            <p>Load order: built-in key from Settings / LTI <code>exercise</code> / <code>?exercise=</code> catalog name;
+               else existing <code>lti_link.json</code>; else full <code>config</code> JSON
+               (LTI custom, or lessons via <code>?inherit=&lt;resource_link_id&gt;</code>);
+               else an empty stub.</p>
 
             <h3>Preload full exercise from lessons.json</h3>
-            <p>Alternate shape when you are not using a built-in — seeds <code>lti_link.json</code> on first empty launch,
-               or via <code>?inherit=&lt;resource_link_id&gt;</code>:</p>
+            <p>Alternate shape when you are not using a built-in — seeds <code>lti_link.json</code> on first empty launch.
+               Use LTI custom <code>config</code>, or reload from <code>$CFG-&gt;lessons</code> with
+               <code>?inherit=&lt;resource_link_id&gt;</code>:</p>
             <div class="code-block">"custom": [
   {
     "key": "config",
