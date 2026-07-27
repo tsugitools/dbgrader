@@ -6,9 +6,8 @@
  *
  *   "custom": [ { "key": "exercise", "value": "PantryExercise" } ]
  *
- * Settings::linkGetCustom('exercise') copies that into the link settings row
- * only when the setting is not already set. Tools may also honor ?exercise=
- * when nothing is configured yet (see exercise.php).
+ * Settings::linkDefaultConfigurationFromLaunch('exercise', catalog keys) seeds Settings from LTI
+ * custom or ?exercise= when the value is in this catalog (see exercise.php).
  */
 
 /**
